@@ -152,7 +152,7 @@
     "cart_add": true,
     "cart_view": true,
     "cart_delete": false,
-    "cart_clear": true,
+    "cart_clear": false,
     "sales_ledger": true,
     "pagination": false
   }
