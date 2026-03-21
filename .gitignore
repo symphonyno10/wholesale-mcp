@@ -1,0 +1,54 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# MCP 로컬 설정
+.mcp.json
+
+# 스크린샷 (로그인 화면 등 노출 가능)
+screenshots/
+
+# 환경변수
+.env
+.env.local
+
+# 크레덴셜 (실제 ID/PW)
+credentials.json
+
+# HTML 샘플 (검색 결과에 약국 정보 포함)
+*.html
+
+# 탐색/테스트 결과물
+exploration_results/
+reports/
+deprecated/
+
+# Claude 개인 설정
+.claude/
+
+# 작업 기록 문서 (퍼블릭에 불필요)
+ANALYSIS.md
+RECIPE_ENHANCEMENT.md
+RECIPE_GENERATION.md
+INSTALL.md
+QUICKSTART.md
+
+# OS
+.DS_Store
+Thumbs.db

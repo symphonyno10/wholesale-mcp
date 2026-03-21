@@ -1,0 +1,87 @@
+{
+  "recipe_version": 4,
+  "site_url": "https://example-spa.com",
+  "site_id": "example_jwt_site",
+  "site_name": "예시 도매 (JWT API 방식)",
+  "encoding": "utf-8",
+  "connection": {
+    "pre_login_get": false,
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "https://example-spa.com/jwt/login",
+    "payload": {
+      "loginId": "{USERNAME}",
+      "pwd": "{PASSWORD}"
+    },
+    "content_type": "application/json",
+    "success_indicator": {
+      "type": "json_field",
+      "path": "accessToken",
+      "value": ""
+    },
+    "token": {
+      "path": "accessToken",
+      "header": "Authorization",
+      "prefix": "Bearer ",
+      "user_data_path": "userData"
+    }
+  },
+  "search": {
+    "method": "GET",
+    "url": "https://example-spa.com/ord/itemSearch",
+    "params": {
+      "keyword": "{KEYWORD}",
+      "custCd": "{CUST_CD}"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM",
+        "manufacturer": "MAKER_NM",
+        "unit_price": "ORD_WP2_AMT",
+        "stock_quantity": "AVAIL_STOCK",
+        "pack_unit": "UNIT"
+      }
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "https://example-spa.com/ord/addBasket",
+    "payload": {
+      "saveItemCd": "{PRODUCT_CODE}",
+      "saveItemQty": "{QUANTITY}",
+      "custCd": "{CUST_CD}",
+      "userId": "{USER_ID}"
+    },
+    "content_type": "application/json",
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상적으로 처리"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "https://example-spa.com/ordLedger/listSearch",
+    "params": {
+      "custCd": "{CUST_CD}",
+      "startDt": "{START_DATE}",
+      "endDt": "{END_DATE}"
+    },
+    "date_format": "%Y%m%d",
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "transaction_date": "APRV_DT",
+        "product_name": "ITEM_NM_UNIT",
+        "sales_amount": "TOTAL_AMT",
+        "balance": "BALANCE_A_AMT"
+      }
+    }
+  }
+}

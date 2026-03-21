@@ -1,0 +1,76 @@
+{
+  "recipe_version": 4,
+  "site_url": "https://example-wholesale.com",
+  "site_id": "example_form_site",
+  "site_name": "예시 도매 (form 방식)",
+  "encoding": "utf-8",
+  "connection": {
+    "pre_login_get": true,
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "https://example-wholesale.com/Common/Certify/Login.asp",
+    "payload": {
+      "tx_id": "{USERNAME}",
+      "tx_pw": "{PASSWORD}"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "cookie",
+      "key": "session_cookie_name"
+    }
+  },
+  "search": {
+    "method": "POST",
+    "url": "https://example-wholesale.com/Service/Order/Order.asp",
+    "params": {
+      "tx_physic": "{KEYWORD}",
+      "so": "0"
+    },
+    "response_type": "html",
+    "content_type": "application/x-www-form-urlencoded",
+    "parsing": {
+      "selector": "tr.product-row",
+      "fields": {
+        "product_name": {"selector": "td:nth-child(3) a", "attribute": "text"},
+        "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
+        "unit_price": {"selector": "td:nth-child(6)", "attribute": "text"},
+        "stock_quantity": {"selector": "input[name^=stock_]", "attribute": "value"},
+        "manufacturer": {"selector": "td:nth-child(2)", "attribute": "text"}
+      }
+    }
+  },
+  "cart_add": {
+    "type": "form",
+    "method": "POST",
+    "url": "https://example-wholesale.com/Service/Order/BagOrder.asp",
+    "form_name": "frmOrder",
+    "product_code_prefix": "pc_",
+    "quantity_prefix": "qty_",
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "https://example-wholesale.com/Service/SalesLedger/SalesLedger.asp",
+    "params": {
+      "sDate": "{START_DATE}",
+      "eDate": "{END_DATE}",
+      "transgu": "{DETAIL_MODE}"
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "tbody tr",
+      "fields": {
+        "transaction_date": {"selector": "td:nth-child(2)", "attribute": "text"},
+        "product_name": {"selector": "td:nth-child(3)", "attribute": "text"},
+        "sales_amount": {"selector": "td:nth-child(8)", "attribute": "text"},
+        "balance": {"selector": "td:last-child", "attribute": "text"}
+      }
+    }
+  }
+}

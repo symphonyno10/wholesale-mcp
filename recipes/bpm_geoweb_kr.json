@@ -1,0 +1,104 @@
+{
+  "recipe_version": 4,
+  "site_url": "https://bpm.geoweb.kr",
+  "site_id": "bpm_geoweb_kr",
+  "site_name": "지오웹BPM",
+  "encoding": "utf-8",
+  "analyzed_by": "mcp-recipe-explorer",
+  "analyzed_at": "2026-03-21T12:44:09.436168+00:00",
+  "connection": {
+    "pre_login_get": true,
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Member/Login",
+    "payload": {
+      "LoginID": "{USERNAME}",
+      "Password": "{PASSWORD}"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "cookie",
+      "key": "GEORELAUTH"
+    }
+  },
+  "search": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Home/PartialSearchProduct",
+    "params": {
+      "srchCate": "",
+      "prdtType": "",
+      "prdOrder": "3",
+      "srchText": "{KEYWORD}",
+      "srchCompany": "",
+      "startdate": "",
+      "enddate": ""
+    },
+    "response_type": "html",
+    "content_type": "application/x-www-form-urlencoded",
+    "parsing": {
+      "selector": "tr.tr-product-list",
+      "fields": {
+        "manufacturer": {
+          "selector": "td.phaCompany span",
+          "attribute": "text"
+        },
+        "product_name": {
+          "selector": "td.proName",
+          "attribute": "text"
+        },
+        "pack_unit": {
+          "selector": "td.standard",
+          "attribute": "text"
+        },
+        "stock_quantity": {
+          "selector": "td.stock span",
+          "attribute": "text"
+        },
+        "product_code": {
+          "selector": "div.div-product-detail ul li:first-child",
+          "attribute": "text"
+        }
+      }
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/add",
+    "payload": {
+      "productCode": "{PRODUCT_CODE}",
+      "moveCode": "",
+      "orderQty": "{QUANTITY}"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "https://bpm.geoweb.kr/MyPage/SalesLedger",
+    "params": {
+      "dtpFrom": "{START_DATE}",
+      "dtpTo": "{END_DATE}",
+      "printFlag": "1",
+      "srchFlag": ""
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "table tr",
+      "fields": {
+        "transaction_date": {"selector": "td:nth-child(1)", "attribute": "text"},
+        "product_code": {"selector": "td:nth-child(2)", "attribute": "text"},
+        "product_name": {"selector": "td:nth-child(4)", "attribute": "text"},
+        "sales_amount": {"selector": "td:nth-child(5)", "attribute": "text"},
+        "payment": {"selector": "td:nth-child(6)", "attribute": "text"},
+        "balance": {"selector": "td:nth-child(7)", "attribute": "text"}
+      }
+    }
+  }
+}

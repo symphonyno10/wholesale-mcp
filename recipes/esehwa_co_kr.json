@@ -1,0 +1,111 @@
+{
+  "recipe_version": 4,
+  "site_url": "https://www.esehwa.co.kr",
+  "site_id": "esehwa_co_kr",
+  "site_name": "세화약품",
+  "encoding": "utf-8",
+  "analyzed_by": "mcp-browser-analysis",
+  "analyzed_at": "2026-03-21T14:00:00.000000+00:00",
+  "connection": {
+    "pre_login_get": false,
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "https://www.esehwa.co.kr/common/ajax/user.asp",
+    "payload": {
+      "chked": "false",
+      "id": "{USERNAME}",
+      "pw": "{PASSWORD}",
+      "mode": "login"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "cookie",
+      "key": "ESEHWAui"
+    }
+  },
+  "search": {
+    "method": "GET",
+    "url": "https://www.esehwa.co.kr/common/ajax/physic.asp",
+    "params": {
+      "f": "1",
+      "unityGu": "",
+      "physicNm": "{KEYWORD}",
+      "venNm": "",
+      "insuCd": "",
+      "page": "1",
+      "often": "0",
+      "flag": "",
+      "physicCd": "",
+      "gu": "",
+      "rank": "",
+      "mask": "",
+      "physic": "{KEYWORD}",
+      "mode": "list"
+    },
+    "pagination": {
+      "type": "param",
+      "page_param": "page",
+      "start_page": 1,
+      "total_pages_path": "totalPage",
+      "max_pages": 10
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "product_code": "physicCd",
+        "product_name": "physicNm",
+        "manufacturer": "makerNm",
+        "unit_price": "unitCost",
+        "stock_quantity": "stock",
+        "pack_unit": "std",
+        "insurance_type": "phyGroupNm",
+        "remark": "soldoutMsg"
+      }
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "https://www.esehwa.co.kr/common/ajax/bag.asp",
+    "payload": {
+      "mode": "add",
+      "physicCds": "{PRODUCT_CODE}",
+      "qtys": "{QUANTITY}",
+      "unitCosts": "0",
+      "ug": "",
+      "orderFlag": "1"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "json_field",
+      "path": "retCode",
+      "value": "0000"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "https://www.esehwa.co.kr/contents/order/saleledger.asp",
+    "params": {
+      "srchFlag": "1",
+      "sel_kind": "1",
+      "sel_srch_opt": "",
+      "tx_dateA": "{START_DATE}",
+      "tx_dateZ": "{END_DATE}",
+      "tx_physic_nm": ""
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "tbody.noOver tr",
+      "fields": {
+        "transaction_date": {"selector": "td:nth-child(2)", "attribute": "text"},
+        "product_name": {"selector": "td.nm", "attribute": "text"},
+        "sales_amount": {"selector": "td:nth-child(8)", "attribute": "text"},
+        "payment": {"selector": "td:nth-child(9)", "attribute": "text"},
+        "balance": {"selector": "td:nth-child(12)", "attribute": "text"}
+      }
+    }
+  }
+}
