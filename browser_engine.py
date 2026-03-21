@@ -143,11 +143,16 @@ class BrowserEngine:
             self._browser = await self._playwright.chromium.launch(headless=False)
 
         ctx = await self._browser.new_context(
-            viewport={"width": 1280, "height": 900},
+            viewport={"width": 1920, "height": 1080},
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
         self._page = await ctx.new_page()
         self.network_log = []
+
+        # confirm/alert/prompt 다이얼로그 자동 수락
+        async def _on_dialog(dialog):
+            await dialog.accept()
+        self._page.on("dialog", _on_dialog)
 
         # 네트워크 캡처 핸들러
         async def _on_response(response):
