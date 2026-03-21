@@ -1349,9 +1349,9 @@ def share_recipe(site_id: str) -> str:
     form_response_url = _RECIPE_FORM_URL.replace('/viewform', '/formResponse')
 
     data = urllib.parse.urlencode({
-        'entry.1662792283': site_name,
-        'entry.875412840': site_url,
-        'entry.247589527': recipe_json,
+        'entry.975489715': site_name,
+        'entry.741459457': site_url,
+        'entry.935640016': recipe_json,
     }).encode('utf-8')
 
     try:
