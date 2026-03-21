@@ -248,9 +248,16 @@ auto_login_all()
    - select → 필터 옵션 (전체/전문/일반 등)
 3. fill_input으로 "타이레놀" 입력 → 버튼 클릭 또는 submit_form()
 4. get_network_log() → 실제 검색 API URL + 파라미터 캡처
-5. 결과 확인:
-   - execute_js로 테이블 구조 확인 (행 셀렉터, td 클래스, hidden div)
-   - JSON 응답이면 필드 매핑 확인
+5. screenshot()으로 검색 결과 화면 직접 확인:
+   - 테이블 컬럼에 가격(단가)이 있는지 눈으로 확인
+   - 없으면 → 상품 1개 클릭 → screenshot() → 상세 패널에 가격 위치 확인
+   - get_network_log()에서 상세 API 캡처 (예: /Home/PartialProductInfo/상품코드)
+6. 결과 파싱 구조 확인:
+   - HTML 응답: execute_js로 테이블 구조 확인 (행 셀렉터, td 클래스, hidden div)
+   - JSON 응답: get_network_log()의 body_preview에서 구조 확인:
+     - 배열 `[{...}]` → json_mapping.items_path: ""
+     - 객체 `{"list": [{...}]}` → json_mapping.items_path: "list"
+     - json_mapping 구조: {"items_path": "경로", "fields": {"product_code": "실제키", ...}}
 ```
 
 ### STEP 3.5: 페이지네이션
@@ -474,22 +481,26 @@ pagination이 없으면 1페이지만 가져옴 (하위 호환).
 
 **유형 D 사이트에서 API 찾는 방법:**
 1. `analyze_page_for_recipe()`로는 API를 못 찾음 (AngularJS $http는 패턴에 안 걸림)
-2. `execute_js`로 Angular scope 함수 목록 확인:
+2. **forms가 비어있으므로 HTML에서 파라미터를 추출할 수 없음**
+3. `execute_js`로 Angular scope 함수 목록 확인:
    ```javascript
    angular.element(document.querySelector('[data-ng-controller]')).scope()
    ```
-3. **Playwright fill이 Angular 모델을 업데이트 안 할 수 있음**
+4. **Playwright fill이 Angular 모델을 업데이트 안 할 수 있음**
    → `execute_js`로 scope에 직접 값 설정:
    ```javascript
    scope.$apply(() => { scope.frm.id = 'user'; scope.frm.pw = 'pass'; });
    scope.Login();
    ```
-4. 검색도 DOM input 값을 직접 설정해야 할 수 있음:
+5. 검색도 DOM input 값을 직접 설정해야 할 수 있음:
    ```javascript
    document.querySelector('#tx_pnm').value = '타이레놀';
    scope.GetList();
    ```
-5. `get_network_log()`로 실제 API URL 캡처
+6. `get_network_log()`로 실제 API URL 캡처
+7. **캡처된 POST body의 파라미터를 그대로 레시피 params에 넣을 것**
+   - HTML forms에서 추출한 파라미터는 불완전 (AngularJS가 동적으로 추가하는 파라미터가 있음)
+   - 반드시 네트워크 캡처 결과를 기준으로 레시피 작성
 
 #### SPA (유형 C/D) 사이트에서 API 찾는 방법
 
