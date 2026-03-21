@@ -770,8 +770,8 @@ class SiteExecutor:
 
         url = self._get_url(cart_clear)
         method = cart_clear.get('method', 'GET')
-        payload = cart_clear.get('payload', {})
-        data = self._resolve_payload(payload, {}) if payload else None
+        raw_params = cart_clear.get('params', cart_clear.get('payload', {}))
+        data = self._resolve_payload(raw_params, {}) if raw_params else None
 
         try:
             if method.upper() == 'GET':
