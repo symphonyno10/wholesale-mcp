@@ -720,6 +720,11 @@ class SiteExecutor:
             name = self._extract_field(row, fields.get('product_name', ''))
             if not name:
                 continue
+            # 추가 필드를 raw_data에 저장 (bag_num, stock_cd 등)
+            raw = {}
+            for field_name, field_spec in fields.items():
+                if field_name not in ('product_name', 'product_code', 'quantity', 'unit_price', 'total_price'):
+                    raw[field_name] = self._extract_field(row, field_spec)
             cart_items.append(CartItem(
                 site_id=self.site_id,
                 product_code=self._extract_field(row, fields.get('product_code', '')),
@@ -727,6 +732,7 @@ class SiteExecutor:
                 quantity=self._parse_int(self._extract_field(row, fields.get('quantity', ''))),
                 unit_price=self._parse_price(self._extract_field(row, fields.get('unit_price', ''))),
                 total_price=self._parse_price(self._extract_field(row, fields.get('total_price', ''))),
+                raw_data=raw,
             ))
         return cart_items
 
@@ -740,6 +746,27 @@ class SiteExecutor:
         url = self._get_url(cart_delete)
         method = cart_delete.get('method', 'POST')
         variables = {'PRODUCT_CODE': product_code, 'product_code': product_code}
+
+        # requires_cart_view: cart_view에서 추가 정보를 가져와서 orderNum 등을 구성
+        if cart_delete.get('requires_cart_view'):
+            items = self.view_cart()
+            target = next((item for item in items if item.product_code == product_code), None)
+            if not target:
+                logger.warning(f"[{self.site_id}] 장바구니에 {product_code} 없음")
+                return False
+            raw = target.raw_data
+            variables.update({
+                'BAG_NUM': str(raw.get('bag_num', '')),
+                'STOCK_CD': str(raw.get('stock_cd', '')),
+                'QUANTITY': str(target.quantity),
+            })
+            # orderNum 포맷 구성
+            fmt = cart_delete.get('order_num_format', '')
+            if fmt:
+                order_num = fmt
+                for k, v in variables.items():
+                    order_num = order_num.replace(f'{{{k}}}', v)
+                variables['ORDER_NUM'] = order_num
 
         try:
             if method.upper() in ('GET', 'DELETE'):

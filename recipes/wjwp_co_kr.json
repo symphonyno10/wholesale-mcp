@@ -111,22 +111,10 @@
         "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
         "quantity": {"selector": "input[name^=bagQty_]", "attribute": "value"},
         "unit_price": {"selector": "input[name^=price_]", "attribute": "value"},
-        "total_price": {"selector": "td.td_num", "attribute": "text"}
+        "total_price": {"selector": "td.td_num", "attribute": "text"},
+        "bag_num": {"selector": "input[name^=bag_num_]", "attribute": "value"},
+        "stock_cd": {"selector": "input[name^=stockcd_]", "attribute": "value"}
       }
-    }
-  },
-  "cart_delete": {
-    "method": "POST",
-    "url": "https://wjwp.co.kr/Service/Order/BagOrder.asp",
-    "payload": {
-      "kind": "delOne",
-      "pc": "{PRODUCT_CODE}",
-      "currVenCd": "{VEN_CD}"
-    },
-    "content_type": "application/x-www-form-urlencoded",
-    "success_indicator": {
-      "type": "status_code",
-      "value": 200
     }
   },
   "cart_clear": {
