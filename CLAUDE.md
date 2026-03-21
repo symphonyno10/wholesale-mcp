@@ -228,6 +228,13 @@ auto_login_all()
 2. snapshot_page()로 버튼/링크 목록 추가 확인:
    - 각 버튼의 텍스트로 기능 파악 ("검색", "담기", "삭제" 등)
    - iframe이 있으면 snapshot_iframe()으로 내부 요소도 확인
+
+3. hidden 메뉴 적극 탐색:
+   - all_links에서 visible=false인 링크 → 숨겨진 메뉴 (매출원장, 주문내역, 세금계산서 등)
+   - 햄버거 메뉴, 드롭다운, 사이드바 토글 버튼 클릭 → 하위 메뉴 노출
+     예: 지오웹의 "조회" 메뉴 클릭 → 매출원장, 세금계산서 등 하위 메뉴 노출
+   - execute_js로 CSS display:none 요소의 HTML도 직접 읽을 수 있음
+   - get_page_html("nav") 또는 get_page_html("[class*=menu]")로 전체 메뉴 HTML 확인
 ```
 
 ### STEP 3: 검색
