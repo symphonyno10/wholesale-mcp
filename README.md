@@ -254,17 +254,44 @@ AI → share_recipe("new_site_com")
 
 현재 등록된 도매사이트: **5개** — 여러분의 레시피로 늘려주세요!
 
-## 보안
+## 보안 및 개인정보
 
-| 파일 | 내용 | git |
-|------|------|-----|
-| `credentials.json` | 사이트별 ID/PW + 거래처 코드 | **제외** (.gitignore) |
-| `.mcp.json` | MCP 서버 로컬 경로 | **제외** (.gitignore) |
-| `recipes/*.json` | 사이트 API 구조 (개인정보 없음) | 포함 |
-| `*.py` | 소스 코드 | 포함 |
+### 아이디/비밀번호는 내 컴퓨터에만 저장됩니다
 
-- 레시피 JSON에는 개인정보가 포함되지 않습니다. 거래처 코드, 약국 이름 등은 `{VEN_CD}`, `{VEN_NM}` 변수로 처리되며, 실제 값은 `credentials.json`에만 저장됩니다.
-- JWT 토큰 기반 사이트(백제약품 등)는 로그인 응답에서 `CUST_CD`, `USER_ID` 등을 자동 추출하므로 `site_params`가 불필요합니다.
+- 사이트 로그인 정보(ID/PW)는 **내 컴퓨터의 `credentials.json` 파일에만** 저장됩니다
+- 외부 서버, 클라우드, 개발자에게 **절대 전송되지 않습니다**
+- 레시피 공유(`share_recipe`) 시에도 ID/PW는 포함되지 않습니다
+- 레시피에서 거래처 코드, 약국 이름 등은 `{VEN_CD}`, `{VEN_NM}` 변수로 처리되며, 실제 값은 `credentials.json`에만 있습니다
+
+### 내 정보 삭제 방법
+
+모든 로그인 정보를 삭제하려면:
+```bash
+# 전체 삭제
+rm credentials.json
+
+# 특정 사이트만 삭제: credentials.json을 열고 해당 사이트 항목을 지우세요
+```
+
+프로그램 전체를 제거하려면:
+```bash
+# pip으로 설치한 경우
+pip uninstall wholesale-mcp
+
+# git clone으로 설치한 경우
+rm -rf wholesale-mcp
+```
+
+삭제 후 어떤 정보도 남지 않습니다.
+
+### 파일별 보안 분류
+
+| 파일 | 내용 | 외부 전송 | git |
+|------|------|:---:|-----|
+| `credentials.json` | 사이트별 ID/PW + 거래처 코드 | **안 함** | **제외** (.gitignore) |
+| `.mcp.json` | MCP 서버 로컬 경로 | **안 함** | **제외** (.gitignore) |
+| `recipes/*.json` | 사이트 API 구조 (개인정보 없음) | 공유 가능 | 포함 |
+| `*.py` | 소스 코드 | - | 포함 |
 
 ## MCP 도구 목록
 
