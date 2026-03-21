@@ -97,7 +97,7 @@
   },
   "cart_delete": {
     "method": "POST",
-    "url": "https://bpm.geoweb.kr/Home/DataCart/remove",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/del",
     "payload": {
       "productCode": "{PRODUCT_CODE}",
       "moveCode": "",
