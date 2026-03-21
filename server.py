@@ -1320,6 +1320,53 @@ def resource_credentials_template() -> str:
     return json.dumps(template, ensure_ascii=False, indent=2)
 
 
+# ═══════════════════════════════════════════
+# 레시피 공유
+# ═══════════════════════════════════════════
+
+# Google Form URL (레시피 제출용)
+_RECIPE_FORM_URL = ""  # Google Form 생성 후 여기에 URL 입력
+
+@mcp.tool()
+def share_recipe(site_id: str) -> str:
+    """레시피를 커뮤니티에 공유합니다. Google Form을 통해 검토 대기열에 제출됩니다."""
+    import urllib.request
+    import urllib.parse
+
+    if not _RECIPE_FORM_URL:
+        raise ValueError("레시피 공유 기능이 아직 설정되지 않았습니다. _RECIPE_FORM_URL을 설정하세요.")
+
+    recipes = _load_recipes()
+    recipe = recipes.get(site_id)
+    if not recipe:
+        raise ValueError(f"레시피 없음: {site_id}")
+
+    site_name = recipe.get('site_name', site_id)
+    site_url = recipe.get('site_url', '')
+    recipe_json = json.dumps(recipe, ensure_ascii=False, indent=2)
+
+    # Google Form 제출 (formResponse URL 사용)
+    form_response_url = _RECIPE_FORM_URL.replace('/viewform', '/formResponse')
+
+    data = urllib.parse.urlencode({
+        'entry.1': site_name,
+        'entry.2': site_url,
+        'entry.3': recipe_json,
+    }).encode('utf-8')
+
+    try:
+        req = urllib.request.Request(form_response_url, data=data)
+        urllib.request.urlopen(req, timeout=10)
+        return json.dumps({
+            "success": True,
+            "site_id": site_id,
+            "site_name": site_name,
+            "message": "레시피가 검토 대기열에 제출되었습니다. 관리자 검토 후 공개됩니다."
+        }, ensure_ascii=False, indent=2)
+    except Exception as e:
+        raise ValueError(f"레시피 제출 실패: {e}")
+
+
 # ── 엔트리포인트 ──
 
 def main():
