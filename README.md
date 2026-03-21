@@ -235,7 +235,25 @@ AI → 5개 사이트 검색 결과에서 "타이레놀정500mg" 필터
      → "백제약품이 30T 6,600원으로 재고 있음. T당 220원으로 가장 저렴합니다."
 ```
 
-#### 예시 6: 레시피 재생성
+#### 예시 6: 장바구니 확인 및 정리
+
+```
+사용자: "장바구니에 뭐 담겨있어?"
+AI → recipe_view_cart("bpm_geoweb_kr")
+   → "지오웹 장바구니: 어린이타이레놀산 x1 (4,370원)"
+
+사용자: "그거 빼줘"
+AI → recipe_delete_from_cart("bpm_geoweb_kr", "094941")
+   → "삭제 완료"
+
+사용자: "전체 사이트 장바구니 다 비워줘"
+AI → recipe_clear_cart("wos_nicepharm_com") → OK
+   → recipe_clear_cart("bpm_geoweb_kr") → OK
+   → recipe_clear_cart("esehwa_co_kr") → OK
+   → "3개 사이트 장바구니 비우기 완료"
+```
+
+#### 예시 7: 레시피 재생성
 
 도매사이트가 리뉴얼되거나, 검색/장바구니가 안 될 때:
 ```
@@ -321,6 +339,9 @@ rm -rf wholesale-mcp
 | `recipe_login(site_id)` | 로그인 (credentials.json에서 자동 로드) |
 | `recipe_search(site_id, keyword)` | 약품 검색 |
 | `recipe_add_to_cart(site_id, code, qty)` | 장바구니 추가 |
+| `recipe_view_cart(site_id)` | 장바구니 내역 조회 |
+| `recipe_delete_from_cart(site_id, code)` | 장바구니에서 특정 상품 삭제 |
+| `recipe_clear_cart(site_id)` | 장바구니 전체 비우기 |
 | `recipe_sales_ledger(site_id, period)` | 매출원장 조회 |
 | `get_recipe(site_id)` | 레시피 JSON 조회 |
 | `get_session_info(site_id)` | 세션 상태 확인 |
