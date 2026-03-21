@@ -742,12 +742,12 @@ class SiteExecutor:
         variables = {'PRODUCT_CODE': product_code, 'product_code': product_code}
 
         try:
-            if method.upper() == 'GET':
+            if method.upper() in ('GET', 'DELETE'):
                 params = cart_delete.get('params', {})
                 data = self._resolve_payload(params, variables) if params else None
                 full_url = self._build_url(url)
                 self._throttle()
-                resp = self.session.get(full_url, params=data, timeout=30)
+                resp = self.session.request(method.upper(), full_url, params=data, timeout=30)
                 if self._encoding and self._encoding.lower() != 'utf-8':
                     resp.encoding = self._encoding
                 resp.raise_for_status()

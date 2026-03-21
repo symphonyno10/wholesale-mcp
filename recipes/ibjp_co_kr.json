@@ -111,27 +111,18 @@
     }
   },
   "cart_delete": {
-    "method": "POST",
-    "url": "https://www.ibjp.co.kr/ord/removeBasket",
-    "payload": {
+    "method": "DELETE",
+    "url": "https://www.ibjp.co.kr/ord/deleteComOrdBasket",
+    "params": {
+      "userId": "{USER_ID}",
       "custCd": "{CUST_CD}",
-      "itemCd": "{PRODUCT_CODE}",
-      "basketGbCd": "01"
+      "itemQty": "",
+      "ordWp2Amt": "",
+      "basketGbCd": "01",
+      "saveItemGbCd": "01",
+      "saveItemCd": "{PRODUCT_CODE}",
+      "dlvBrchCd": "{DLV_BRCH_CD}"
     },
-    "content_type": "application/json",
-    "success_indicator": {
-      "type": "contains",
-      "value": "정상적으로 처리"
-    }
-  },
-  "cart_clear": {
-    "method": "POST",
-    "url": "https://www.ibjp.co.kr/ord/removeBasketAll",
-    "payload": {
-      "custCd": "{CUST_CD}",
-      "basketGbCd": "01"
-    },
-    "content_type": "application/json",
     "success_indicator": {
       "type": "contains",
       "value": "정상적으로 처리"
