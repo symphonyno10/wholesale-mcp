@@ -283,10 +283,12 @@ auto_login_all()
 3. 둘 다 없으면 → pagination 없음 (한 번에 전체 반환)
 ```
 
-### STEP 4: 장바구니 추가
+### STEP 4: 장바구니 전체 흐름 (담기 → 조회 → 삭제 → 비우기)
+
+**이 STEP은 한 세션에서 연속 실행한다. 네트워크 로그를 끊지 않고 전체 흐름을 캡처한다.**
 
 ```
-1. "담기", "장바구니", "주문" 버튼 발견 → 코드 추적:
+1. "담기" 버튼 발견 → 코드 추적:
    A) 버튼이 frmOrder 등 form 안에 있으면 → form 방식
       - form action URL = cart_add URL
       - input[name^=pc_] → product_code_prefix
@@ -296,31 +298,34 @@ auto_login_all()
       - jsf_com_GetAjax 같은 래퍼 안에 실제 URL이 있을 수 있음
    C) SPA: 버튼 클릭 → get_network_log()로 POST 캡처
 
-2. 실제 담기 테스트:
+2. 실제 담기 실행:
    - 검색 결과에서 재고 있는 상품 선택
-   - 담기 실행 → get_network_log()로 실제 요청 확인
-```
+   - 담기 버튼 클릭 또는 submit
+   - screenshot() → 장바구니에 상품이 추가되었는지 확인
+   - get_network_log() → cart_add API 캡처
 
-### STEP 4.5: 장바구니 관리 (조회/삭제/비우기)
+3. 장바구니 조회 (cart_view):
+   - 담기 직후 자동으로 장바구니가 새로고침되면 → get_network_log()에서 조회 API 캡처
+   - iframe 있으면 → snapshot_iframe() → iframe src URL이 cart_view URL
+   - screenshot() → 장바구니 영역에 방금 담은 상품이 보이는지 확인
 
-```
-1. 장바구니 UI 찾기:
-   - snapshot_page()에서 iframe 있으면 → snapshot_iframe()으로 내부 확인
-   - iframe 없으면 메인 페이지에서 직접 확인
+4. 개별 삭제 (cart_delete):
+   - 장바구니 영역에서 "삭제" 버튼/아이콘 찾기 → screenshot()으로 위치 확인
+   - 해당 요소의 코드 추적 (href/onclick/ng-click → 함수 소스 → API URL)
+   - 삭제 버튼 클릭 → get_network_log() → cart_delete API 캡처
+   - screenshot() → 상품이 제거되었는지 확인
 
-2. 버튼 텍스트로 기능 인식:
-   - "장바구니 비우기", "전체삭제" → cart_clear
-   - "삭제", 휴지통 아이콘 → cart_delete
+5. 전체 비우기 (cart_clear):
+   - 다시 상품 1개 담기 (장바구니가 비어있으면 비우기 버튼이 안 보일 수 있음)
+   - "장바구니 비우기", "전체삭제" 버튼 찾기 → screenshot()으로 위치 확인
+   - 해당 요소의 코드 추적
+   - 비우기 버튼 클릭 → get_network_log() → cart_clear API 캡처
+   - screenshot() → 장바구니가 비었는지 확인
 
-3. 발견된 요소의 코드 추적 (공통 원칙 A~D 적용)
-   **cart_delete는 필수** — 반드시 삭제 버튼/아이콘을 찾아 코드 추적할 것
-   찾지 못하면 execute_js로 외부 JS 파일을 fetch해서 del/delete/remove 키워드 검색
-
-4. cart_view: 상품 담기 후 get_network_log()에서 조회 API 자동 캡처
-   또는 iframe src URL이 곧 cart_view URL
-
-5. 없는 기능: cart_clear 없으면 생략 (코드가 폴백 자동 수행)
-   **단, cart_delete는 가능한 한 반드시 찾을 것**
+6. 전체 네트워크 로그 정리:
+   - get_network_log() → 이 STEP에서 발생한 모든 요청 확인
+   - cart 관련 URL 전부 추출 (add, del, clear, list, view 등)
+   - 각 API의 method, URL, 파라미터를 레시피에 반영
 ```
 
 ### STEP 5: 매출원장
