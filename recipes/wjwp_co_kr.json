@@ -5,7 +5,7 @@
   "site_name": "우정약품",
   "encoding": "utf-8",
   "analyzed_by": "mcp-browser-analysis",
-  "analyzed_at": "2026-03-21T13:40:00.000000+00:00",
+  "analyzed_at": "2026-03-21T14:00:00.000000+00:00",
   "connection": {
     "pre_login_get": true,
     "request_interval_ms": 500,
@@ -16,9 +16,7 @@
     "url": "https://wjwp.co.kr/Common/Certify/Login.asp",
     "payload": {
       "tx_id": "{USERNAME}",
-      "tx_pw": "{PASSWORD}",
-      "x": "37",
-      "y": "34"
+      "tx_pw": "{PASSWORD}"
     },
     "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
@@ -32,9 +30,7 @@
     "params": {
       "so": "0",
       "so2": "0",
-      "currMkind": "",
       "tx_physic": "{KEYWORD}",
-      "sa": "phy",
       "tx_maker": ""
     },
     "response_type": "html",
@@ -111,11 +107,24 @@
         "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
         "quantity": {"selector": "input[name^=bagQty_]", "attribute": "value"},
         "unit_price": {"selector": "input[name^=price_]", "attribute": "value"},
-        "total_price": {"selector": "td.td_num", "attribute": "text"},
-        "bag_num": {"selector": "input[name^=bag_num_]", "attribute": "value"},
-        "stock_cd": {"selector": "input[name^=stockcd_]", "attribute": "value"}
+        "total_price": {"selector": "td.td_num", "attribute": "text"}
       }
     }
+  },
+  "cart_delete": {
+    "method": "POST",
+    "url": "https://wjwp.co.kr/Service/Order/ControlBag.asp",
+    "payload": {
+      "vc": "{VEN_CD}",
+      "pc": "{PRODUCT_CODE}",
+      "f": "true"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
+    },
+    "notes": "삭제가 아닌 주문 제외 처리. f=true로 제외, f=false로 복원."
   },
   "cart_clear": {
     "method": "GET",
@@ -123,7 +132,8 @@
     "params": {
       "kind": "del",
       "currVenCd": "{VEN_CD}",
-      "currMkind": ""
+      "currMkind": "",
+      "currRealVenCd": ""
     },
     "success_indicator": {
       "type": "status_code",
