@@ -251,18 +251,9 @@ auto_login_all()
 5. screenshot()으로 검색 결과 화면 직접 확인:
    - 테이블 컬럼에 가격(단가)이 있는지 눈으로 확인
    - 없으면 → 상품 1개 클릭 → screenshot() → 상세 패널에 가격 위치 확인
-   - get_network_log()에서 상세 API 캡처 (예: /Home/PartialProductInfo/상품코드)
-   - **반드시 레시피의 search 섹션에 product_detail을 추가할 것:**
-     ```json
-     "product_detail": {
-       "method": "POST",
-       "url": "https://사이트/상세API/{PRODUCT_CODE}",
-       "payload": {"num": "{STOCK_QUANTITY}"},
-       "response_type": "html",
-       "unit_price_selector": "#div_product_price ul li:nth-child(3)"
-     }
-     ```
-   - 발견만 하고 레시피에 안 넣으면 의미 없음. 반드시 JSON에 포함
+   - get_network_log()에서 상세 API 캡처
+   - 캡처한 API의 URL, 메서드, 파라미터, 응답에서 가격 위치를 레시피에 반영
+   - 발견만 하고 레시피에 안 넣으면 의미 없음
 6. 결과 파싱 구조 확인:
    - HTML 응답: execute_js로 테이블 구조 확인 (행 셀렉터, td 클래스, hidden div)
    - JSON 응답: get_network_log()의 body_preview에서 구조 확인:
