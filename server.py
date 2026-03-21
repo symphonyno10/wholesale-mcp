@@ -1150,31 +1150,45 @@ A) js_handlers.ajax_urls에 /DataCart/ 또는 /cart/add 있으면 → API 방식
    execute_js로 해당 함수 소스 확인하여 payload 파악
 B) ajax_urls 비어있으면 → form 방식 (frmOrder 폼 제출)
 
-## STEP 4.5: 장바구니 관리 API 탐색
+## STEP 4.5: 장바구니 관리 API — 버튼 발견 → 코드 추적
 
-cart_add가 확정된 후, 장바구니 조회/삭제/비우기 API를 찾는다.
+원칙: UI에서 버튼/링크를 먼저 찾고, 그 요소의 코드를 추적하여 실제 API를 확정한다.
 
-### cart_view (장바구니 조회):
-- STEP 2의 ajax_urls에서 "Cart", "Bag", "basket", "PartialProductCart" 포함 URL
-- form 사이트: snapshot_page()의 iframe src에서 Bag.asp URL
-- JWT 사이트: ajax_urls 또는 네트워크 로그에서 basketList GET 엔드포인트
-- AngularJS: ajax_urls 또는 /ajax/bag.asp?mode=list
-- 상품 1개 담기 → 조회 API 호출 → 응답 구조 확인 (HTML 테이블 or JSON 배열)
+### 1단계: 장바구니 UI 찾기
+snapshot_page()에서 장바구니 영역을 찾는다:
+- iframe이 있으면(ifrm_bag 등) → snapshot_iframe()으로 내부 버튼/링크 확인
+- iframe 없으면 메인 페이지에서 직접 확인
 
-### cart_delete (개별 삭제):
-- AJAX 사이트: ajax_urls에서 "del", "DataCart/del" URL
-- form 사이트: 장바구니 JS(Bag.js 등)에서 삭제 함수 확인
-  → execute_js로 JS 파일 fetch → "btn_delete", "Bag_Del" 등 함수 소스 추출
-  → 실제 URL + 파라미터 확인 (BagOrder.asp?kind=multiupdbag&actflag=DEL 등)
-- SPA(JWT): 삭제 아이콘 클릭 → get_network_log()로 DELETE 요청 캡처
-- AngularJS: ng-click에서 삭제 함수명 → JS에서 AJAX URL 추출
+### 2단계: 버튼/링크 텍스트로 기능 인식
+장바구니 영역에서 찾아야 할 키워드:
+- "장바구니 비우기", "전체삭제" → cart_clear 후보
+- "삭제", 휴지통 아이콘 → cart_delete 후보
+- "주문전송" → order_submit 후보
 
-### cart_clear (전체 비우기):
-- "장바구니 비우기", "전체삭제" 버튼/링크 확인
-- form 사이트: "BagOrder.asp?kind=del" 패턴
-- AJAX: ajax_urls에서 "alldel" URL, 또는 "전체삭제" 버튼의 onclick 확인
-- AngularJS: "Bag_DeleteAll" 함수 → JS에서 mode=delall 등 확인
-- 없으면: cart_view + cart_delete 반복으로 폴백 가능 (코드에 이미 구현됨)
+### 3단계: 발견된 요소의 코드를 추적하여 API 확정
+
+A) href에 URL이 직접 있으면 → 즉시 확정
+   예: href="./BagOrder.asp?kind=del&currVenCd=REDACTED_CODE" → cart_clear URL
+
+B) onclick/ng-click/@click에 함수명이 있으면 → execute_js로 함수 소스 추적
+   예: ng-click="Bag_Del(item)" → JS 파일 fetch → 함수 안의 AJAX URL 추출
+
+C) jQuery 이벤트(#btn_delete 등) → 외부 JS 파일 fetch → 핸들러 소스 분석
+   예: Bag.js에서 $("#btn_delete").on("click",...) 핸들러 읽기
+   → BagOrder.asp?kind=multiupdbag&actflag=DEL&orderNum=... 확정
+
+D) SPA에서 이벤트가 안 보이면 → click_element() 클릭 + get_network_log() 캡처
+   예: img[alt="삭제"] 클릭 → DELETE /ord/deleteComOrdBasket 캡처
+
+### 4단계: cart_view 확인
+- 상품 1개 담기 후 get_network_log()에서 장바구니 조회 API 자동 캡처
+  (담기 직후 대부분 사이트가 장바구니 목록을 자동 새로고침)
+- 또는 iframe src URL이 곧 cart_view URL
+- 응답 파싱 구조 확인 (HTML 셀렉터 or JSON 필드)
+
+### 5단계: 없는 기능
+- cart_clear 없으면 → 생략 (코드가 cart_view+cart_delete 폴백 자동 수행)
+- cart_delete 없으면 → cart_clear만으로 대체 가능
 
 ## STEP 5: 매출원장
 

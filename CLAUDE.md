@@ -264,28 +264,29 @@ B) ajax_urls에 장바구니 URL 없으면 → form 방식
    - form_name, product_code_prefix, quantity_prefix 확정
 ```
 
-### STEP 4.5: 장바구니 관리 API 탐색
+### STEP 4.5: 장바구니 관리 API — 버튼 발견 → 코드 추적
 
 ```
-cart_add가 확정된 후, 장바구니 조회/삭제/비우기 API를 찾는다.
+원칙: UI에서 버튼/링크를 먼저 찾고, 그 요소의 코드를 추적하여 API를 확정한다.
 
-1. cart_view:
-   - ajax_urls에서 "Cart", "Bag", "basket" 포함 URL → 조회 API
-   - form 사이트: iframe src에서 Bag.asp URL
-   - JSON API: basketList GET 엔드포인트
-   - 상품 1개 담기 → 조회 API 호출 → 응답 파싱 구조 확인
+1. 장바구니 UI 찾기:
+   - snapshot_page()에서 iframe 있으면 → snapshot_iframe()으로 내부 확인
+   - iframe 없으면 메인 페이지에서 직접 확인
 
-2. cart_delete:
-   - AJAX: ajax_urls에서 "del", "DataCart/del" URL
-   - form: 장바구니 JS(Bag.js)에서 삭제 함수 → execute_js로 소스 확인
-   - SPA: 삭제 아이콘 클릭 → get_network_log()로 캡처
-   - AngularJS: ng-click에서 함수명 → JS에서 실제 URL 추출
+2. 버튼 텍스트로 기능 인식:
+   - "장바구니 비우기", "전체삭제" → cart_clear
+   - "삭제", 휴지통 아이콘 → cart_delete
 
-3. cart_clear:
-   - "장바구니 비우기", "전체삭제" 버튼/링크 확인
-   - form: "BagOrder.asp?kind=del" 패턴
-   - AJAX: ajax_urls에서 "alldel" URL
-   - 없으면: cart_view + cart_delete 반복으로 폴백 (코드에 이미 구현됨)
+3. 발견된 요소의 코드 추적:
+   A) href에 URL 직접 있으면 → 즉시 확정
+   B) onclick/ng-click에 함수명 → execute_js로 함수 소스 추적 → AJAX URL 추출
+   C) jQuery 이벤트(#btn_delete) → 외부 JS fetch → 핸들러 소스 분석
+   D) SPA에서 이벤트 안 보이면 → click_element() + get_network_log() 캡처
+
+4. cart_view: 상품 담기 후 get_network_log()에서 조회 API 자동 캡처
+   또는 iframe src URL이 곧 cart_view URL
+
+5. 없는 기능: cart_clear 없으면 생략 (코드가 폴백 자동 수행)
 ```
 
 ### STEP 5: 매출원장 확인
