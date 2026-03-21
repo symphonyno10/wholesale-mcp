@@ -1,78 +1,62 @@
 {
-  "recipe_version": 4,
-  "site_url": "https://bpm.geoweb.kr",
   "site_id": "bpm_geoweb_kr",
-  "site_name": "지오웹BPM",
+  "site_name": "지오영",
+  "site_url": "https://bpm.geoweb.kr",
   "encoding": "utf-8",
-  "analyzed_by": "mcp-recipe-explorer",
-  "analyzed_at": "2026-03-21T12:44:09.436168+00:00",
-  "connection": {
-    "pre_login_get": true,
-    "request_interval_ms": 500,
-    "ssl_verify": true
-  },
+  "recipe_version": "1.0",
   "login": {
-    "method": "POST",
     "url": "https://bpm.geoweb.kr/Member/Login",
+    "method": "POST",
     "payload": {
-      "LoginID": "{USERNAME}",
-      "Password": "{PASSWORD}"
+      "LoginID": "{username}",
+      "Password": "{password}"
     },
-    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "cookie",
       "key": "GEORELAUTH"
     }
   },
   "search": {
-    "method": "POST",
     "url": "https://bpm.geoweb.kr/Home/PartialSearchProduct",
+    "method": "POST",
     "params": {
+      "srchText": "{keyword}",
       "srchCate": "",
       "prdtType": "",
       "prdOrder": "3",
-      "srchText": "{KEYWORD}",
       "srchCompany": "",
       "startdate": "",
       "enddate": ""
     },
     "response_type": "html",
-    "content_type": "application/x-www-form-urlencoded",
     "parsing": {
-      "selector": "tr.tr-product-list",
+      "row_selector": "tr.tr-product-list",
       "fields": {
-        "manufacturer": {
-          "selector": "td.phaCompany span",
-          "attribute": "text"
-        },
-        "product_name": {
-          "selector": "td.proName",
-          "attribute": "text"
-        },
-        "pack_unit": {
-          "selector": "td.standard",
-          "attribute": "text"
-        },
-        "stock_quantity": {
-          "selector": "td.stock span",
-          "attribute": "text"
-        },
-        "product_code": {
-          "selector": "div.div-product-detail ul li:first-child",
-          "attribute": "text"
-        }
+        "product_code": "div.div-product-detail ul li:first-child",
+        "product_name": "td.proName",
+        "manufacturer": "td.phaCompany span",
+        "specification": "td.standard",
+        "stock": "td.stock span"
       }
+    },
+    "product_detail": {
+      "method": "POST",
+      "url": "https://bpm.geoweb.kr/Home/PartialProductInfo/{PRODUCT_CODE}",
+      "payload": {"num": "{STOCK_QUANTITY}"},
+      "response_type": "html",
+      "unit_price_selector": "#div_product_price ul li:nth-child(3)",
+      "notes": "검색 목록에 가격 없음. 상품 클릭 시 제품정보 패널에서 주문단가 확인."
     }
   },
   "cart_add": {
-    "method": "POST",
+    "type": "api",
     "url": "https://bpm.geoweb.kr/Home/DataCart/add",
+    "method": "POST",
     "payload": {
-      "productCode": "{PRODUCT_CODE}",
+      "productCode": "{product_code}",
       "moveCode": "",
-      "orderQty": "{QUANTITY}"
+      "orderQty": "{quantity}"
     },
-    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "result",
@@ -80,71 +64,56 @@
     }
   },
   "cart_view": {
-    "method": "POST",
     "url": "https://bpm.geoweb.kr/Home/PartialProductCart",
+    "method": "POST",
     "response_type": "html",
-    "content_type": "application/x-www-form-urlencoded",
     "parsing": {
-      "selector": "tr.tr_cart_list",
+      "row_selector": "table tbody tr",
       "fields": {
-        "product_name": {"selector": "td.phaCompany", "attribute": "text"},
-        "quantity": {"selector": "input.inp_cart_modify", "attribute": "value"},
-        "unit_price": {"selector": "td.unitPrice", "attribute": "text"},
-        "total_price": {"selector": "td.amountMoney", "attribute": "text"},
-        "product_code": {"selector": "div.div_cart_detail ul li:first-child", "attribute": "text"}
+        "product_name": "td.phaCompany",
+        "quantity": "td.quantity",
+        "price": "td.unitPrice",
+        "total": "td.amountMoney"
       }
     }
   },
   "cart_delete": {
-    "method": "POST",
     "url": "https://bpm.geoweb.kr/Home/DataCart/del",
+    "method": "POST",
     "payload": {
-      "productCode": "{PRODUCT_CODE}",
+      "productCode": "{product_code}",
       "moveCode": "",
       "orderQty": "0"
-    },
-    "content_type": "application/x-www-form-urlencoded",
-    "success_indicator": {
-      "type": "json_field",
-      "path": "result",
-      "value": "1"
     }
   },
   "cart_clear": {
-    "method": "POST",
-    "url": "https://bpm.geoweb.kr/Home/DataCart/alldel",
-    "payload": {
-      "productCode": "",
-      "moveCode": "",
-      "orderQty": "0"
-    },
-    "content_type": "application/x-www-form-urlencoded",
-    "success_indicator": {
-      "type": "json_field",
-      "path": "result",
-      "value": "1"
-    }
+    "url": "https://bpm.geoweb.kr/Home/DataCart/delAll",
+    "method": "POST"
   },
   "sales_ledger": {
-    "method": "GET",
     "url": "https://bpm.geoweb.kr/MyPage/SalesLedger",
+    "method": "GET",
     "params": {
-      "dtpFrom": "{START_DATE}",
-      "dtpTo": "{END_DATE}",
-      "printFlag": "1",
+      "dtpFrom": "{start_date}",
+      "dtpTo": "{end_date}",
+      "printFlag": "2",
       "srchFlag": ""
     },
+    "date_format": "%Y-%m-%d",
     "response_type": "html",
     "parsing": {
-      "selector": "table tr",
+      "row_selector": "table tbody tr",
       "fields": {
-        "transaction_date": {"selector": "td:nth-child(1)", "attribute": "text"},
-        "product_code": {"selector": "td:nth-child(2)", "attribute": "text"},
-        "product_name": {"selector": "td:nth-child(4)", "attribute": "text"},
-        "sales_amount": {"selector": "td:nth-child(5)", "attribute": "text"},
-        "payment": {"selector": "td:nth-child(6)", "attribute": "text"},
-        "balance": {"selector": "td:nth-child(7)", "attribute": "text"}
+        "date": "td.date",
+        "product_name": "td.proName",
+        "sales_amount": "td.salAmountMoney",
+        "deposit_amount": "td.dipAmountMoney",
+        "balance": "td.balance"
       }
     }
+  },
+  "connection": {
+    "request_interval_ms": 500,
+    "timeout_ms": 15000
   }
 }
