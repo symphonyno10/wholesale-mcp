@@ -1325,7 +1325,7 @@ def resource_credentials_template() -> str:
 # ═══════════════════════════════════════════
 
 # Google Form URL (레시피 제출용)
-_RECIPE_FORM_URL = ""  # Google Form 생성 후 여기에 URL 입력
+_RECIPE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf9-Ij0DgX20UJDGS2LTp0CxiLz_wQfm90dTf3WvB5G3ovYSw/viewform"
 
 @mcp.tool()
 def share_recipe(site_id: str) -> str:
@@ -1349,9 +1349,9 @@ def share_recipe(site_id: str) -> str:
     form_response_url = _RECIPE_FORM_URL.replace('/viewform', '/formResponse')
 
     data = urllib.parse.urlencode({
-        'entry.1': site_name,
-        'entry.2': site_url,
-        'entry.3': recipe_json,
+        'entry.1662792283': site_name,
+        'entry.875412840': site_url,
+        'entry.247589527': recipe_json,
     }).encode('utf-8')
 
     try:
