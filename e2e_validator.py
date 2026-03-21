@@ -257,15 +257,21 @@ def main():
 
     else:
         # 단일 사이트 테스트
+        # --cred 옵션으로 다른 크레덴셜 사용 가능
         site_id = sys.argv[1]
+        cred_id = site_id
+        for i, arg in enumerate(sys.argv):
+            if arg == "--cred" and i + 1 < len(sys.argv):
+                cred_id = sys.argv[i + 1]
+
         recipe = load_recipe(site_id)
         if not recipe:
             print(f"레시피 없음: recipes/{site_id}.json")
             sys.exit(1)
 
-        cred = creds.get(site_id)
+        cred = creds.get(cred_id)
         if not cred:
-            print(f"크레덴셜 없음: {site_id}")
+            print(f"크레덴셜 없음: {cred_id}")
             sys.exit(1)
 
         results = test_site(site_id, recipe, cred)
