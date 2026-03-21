@@ -183,92 +183,108 @@ auto_login_all()
 | `recent_post_requests` | 네트워크 캡처된 POST | 실제 API URL + payload |
 | `cookies` | 현재 쿠키 목록 | 인증 쿠키 이름 |
 
-### STEP 1: 사이트 접속 + 로그인
+### 공통 원칙: 버튼 발견 → 코드 추적 → API 확정
 
 ```
-1. open_site(url) → 사이트 열기
-2. analyze_page_for_recipe("login") → 3종 분석 결과 확인
-   - forms[0].fields에서 is_username=true, is_password=true인 필드명 확인
-   - forms[0].action에서 로그인 POST URL 확인
-   - html_forms_raw에서 hidden 필드 확인
-3. fill_input으로 로그인 정보 입력
-4. capture_form_submission() → 실제 POST 요청 캡처
-   - 반환된 request.url이 정확한 로그인 URL
-   - 반환된 request.post_data가 정확한 payload
-5. get_cookies() → 로그인 후 새로 생긴 쿠키 = success_indicator
+모든 STEP에서 동일한 방법을 사용한다:
+1. snapshot_page() 또는 snapshot_iframe()으로 UI 요소(버튼/링크/폼) 발견
+2. 요소의 텍스트로 기능 인식 ("로그인", "검색", "담기", "삭제" 등)
+3. 해당 요소의 코드를 추적하여 실제 API 확정:
+   A) href/action에 URL 직접 있으면 → 즉시 확정
+   B) onclick/ng-click 함수명 → execute_js로 함수 소스 추적 → URL 추출
+   C) jQuery 이벤트 → 외부 JS fetch → 핸들러 소스 분석
+   D) 이벤트가 안 보이면 → click_element() + get_network_log() 캡처
+4. capture_form_submission()으로 실제 전송되는 POST 데이터 검증
 ```
 
-### STEP 2: 메인 페이지 3종 분석 (가장 중요)
+### STEP 1: 로그인
 
 ```
-1. analyze_page_for_recipe("search") → 메인 페이지 전체 분석
-
-   이 한 번의 호출로 다음을 모두 파악:
-
-   a) 검색 필드: forms[].fields에서 is_search=true인 필드
-   b) 검색 API: js_handlers.ajax_urls에서 Search/Product 포함 URL
-   c) 장바구니 API: js_handlers.ajax_urls에서 Cart/Bag 포함 URL
-   d) 장바구니 함수: js_handlers.cart_functions (AddCart, ProcessCart 등)
-   e) 매출원장: all_links에서 "매출원장" 텍스트 + href (visible=false일 수 있음)
-   f) 기타 메뉴: 주문내역, 세금계산서, 반품 등
+1. open_site(url) → snapshot_page()
+2. "로그인" 버튼 발견 → 근처의 입력 필드 확인:
+   - password 타입 필드 → 비밀번호
+   - text 타입 필드 (위에 있는 것) → 아이디
+   - 또는 analyze_page_for_recipe("login")의 is_username/is_password 자동 태깅
+3. fill_input으로 ID/PW 입력
+4. "로그인" 버튼의 코드 추적:
+   - form action → 로그인 POST URL
+   - SPA는 버튼 클릭 → get_network_log()로 실제 POST 캡처
+   - AngularJS는 ng-click 함수 추적 → AJAX URL 확인
+5. capture_form_submission() → 실제 전송된 URL + payload 최종 확정
+6. get_cookies() → 로그인 후 새로 생긴 쿠키 = success_indicator
+   - JWT 사이트: 쿠키 없음 → get_network_log()에서 토큰 응답 확인
 ```
 
-### STEP 3: 검색 실행 + 결과 파싱 구조 확인
+### STEP 2: 메인 페이지 전체 분석
 
 ```
-1. fill_input으로 검색어 입력 (예: "타이레놀")
-2. submit_form() → 검색 실행
-3. get_network_log("POST") → 실제 검색 API URL + 파라미터 캡처
-4. get_page_html("table") 또는 execute_js로 결과 HTML 구조 확인:
-   - 행 셀렉터: tr의 class 확인 (tr.ln_physic, tr.tr-product-list 등)
-   - 각 td의 class 확인 (td.proName, td.stock 등)
-   - hidden div 구조: div.div-product-detail 안의 li 목록 → 상품코드 위치
-   - input 필드: input[name^=pc_] → 상품코드
+1. analyze_page_for_recipe("search") → 3종 동시 수집:
+   - forms: 모든 폼 + 필드 (검색, 주문 등)
+   - all_links: 모든 메뉴 (visible + hidden) — "매출원장", "주문내역" 등
+   - js_handlers: 외부 JS의 AJAX URL + 함수명
+   - html_forms_raw: form 태그 원문
+   - iframes: 장바구니 iframe 등
+
+2. snapshot_page()로 버튼/링크 목록 추가 확인:
+   - 각 버튼의 텍스트로 기능 파악 ("검색", "담기", "삭제" 등)
+   - iframe이 있으면 snapshot_iframe()으로 내부 요소도 확인
 ```
 
-### STEP 3.5: 페이지네이션 판별
+### STEP 3: 검색
 
 ```
-검색 결과가 나온 후 페이지네이션 여부를 확인한다:
-
-A) JSON API 응답에 totalPage/totalRec 필드가 있으면 → type: "param"
-   - get_network_log()로 JSON 응답 확인
-   - totalPage > 1이면 페이지네이션 필요
-   - page_param: 요청 파라미터 중 "page" 키 확인
-   - 예: 세화약품 GET /common/ajax/physic.asp?page=1 → totalPage=3
-
-B) HTML 응답에 페이지 링크(div.paging, Page=2 등)가 있으면 → type: "html_links"
-   - get_page_html("div.paging") 또는 execute_js로 확인
-   - paging_selector: 페이지 링크의 CSS 셀렉터
-   - page_url_param: URL에서 페이지 번호 파라미터명 (Page, page, p 등)
-   - method_override: 2페이지부터 GET인지 POST인지 확인
-   - 예: 복산나이스팜 POST → 결과에 div.paging a[href="Order.asp?Page=2&..."]
-
-C) 한 번에 전체 결과 반환 → pagination 없음
-   - JSON 응답에 totalPage 없고, HTML에 페이지 링크 없음
-   - 예: 백제약품, 지오웹BPM
+1. "검색" 또는 "조회" 버튼 발견 → 코드 추적:
+   - 버튼이 form 안에 있으면 → form action이 검색 URL
+   - onclick/submit 함수가 있으면 → 함수 소스에서 AJAX URL 추출
+2. 검색 필드 확인:
+   - 버튼 근처의 text input → 키워드 필드
+   - select → 필터 옵션 (전체/전문/일반 등)
+3. fill_input으로 "타이레놀" 입력 → 버튼 클릭 또는 submit_form()
+4. get_network_log() → 실제 검색 API URL + 파라미터 캡처
+5. 결과 확인:
+   - execute_js로 테이블 구조 확인 (행 셀렉터, td 클래스, hidden div)
+   - JSON 응답이면 필드 매핑 확인
 ```
 
-### STEP 4: 장바구니 방식 결정
+### STEP 3.5: 페이지네이션
 
 ```
-AI가 STEP 2의 js_handlers 결과를 보고 판단:
+검색 결과 페이지에서 페이지 이동 요소를 찾는다:
 
-A) ajax_urls에 "/DataCart/" 또는 "/cart/add" 있으면 → API 방식
-   - cart_functions에서 함수명 확인 (AddCart, ProcessCart)
-   - execute_js로 해당 함수 소스 확인: ProcessCart.toString()
-   - API URL + payload 파라미터명 확정
+1. "다음", "2", "3" 같은 페이지 링크/버튼 발견 → href 확인:
+   - href에 Page=2, page=2 등 파라미터 → type: "html_links"
+   - paging_selector: 해당 링크들의 CSS 셀렉터
+   - page_url_param: URL의 페이지 파라미터명
+   - method_override: 1페이지 POST → 2페이지 GET인 경우
 
-B) ajax_urls에 장바구니 URL 없으면 → form 방식
-   - forms에서 action에 "Bag", "Cart", "Order" 포함 폼 확인
-   - form_name, product_code_prefix, quantity_prefix 확정
+2. 페이지 링크 없으면 → get_network_log()에서 JSON 응답 확인:
+   - totalPage/totalRec 필드 있으면 → type: "param"
+   - page_param: 요청의 page 파라미터명
+
+3. 둘 다 없으면 → pagination 없음 (한 번에 전체 반환)
 ```
 
-### STEP 4.5: 장바구니 관리 API — 버튼 발견 → 코드 추적
+### STEP 4: 장바구니 추가
 
 ```
-원칙: UI에서 버튼/링크를 먼저 찾고, 그 요소의 코드를 추적하여 API를 확정한다.
+1. "담기", "장바구니", "주문" 버튼 발견 → 코드 추적:
+   A) 버튼이 frmOrder 등 form 안에 있으면 → form 방식
+      - form action URL = cart_add URL
+      - input[name^=pc_] → product_code_prefix
+      - input[name^=qty_] → quantity_prefix
+   B) 버튼의 onclick에 함수명(AddCart, ProcessCart 등) → 함수 소스 추적
+      - execute_js로 함수.toString() → AJAX URL + payload 파라미터 추출
+      - jsf_com_GetAjax 같은 래퍼 안에 실제 URL이 있을 수 있음
+   C) SPA: 버튼 클릭 → get_network_log()로 POST 캡처
 
+2. 실제 담기 테스트:
+   - 검색 결과에서 재고 있는 상품 선택
+   - 담기 실행 → get_network_log()로 실제 요청 확인
+```
+
+### STEP 4.5: 장바구니 관리 (조회/삭제/비우기)
+
+```
 1. 장바구니 UI 찾기:
    - snapshot_page()에서 iframe 있으면 → snapshot_iframe()으로 내부 확인
    - iframe 없으면 메인 페이지에서 직접 확인
@@ -277,11 +293,7 @@ B) ajax_urls에 장바구니 URL 없으면 → form 방식
    - "장바구니 비우기", "전체삭제" → cart_clear
    - "삭제", 휴지통 아이콘 → cart_delete
 
-3. 발견된 요소의 코드 추적:
-   A) href에 URL 직접 있으면 → 즉시 확정
-   B) onclick/ng-click에 함수명 → execute_js로 함수 소스 추적 → AJAX URL 추출
-   C) jQuery 이벤트(#btn_delete) → 외부 JS fetch → 핸들러 소스 분석
-   D) SPA에서 이벤트 안 보이면 → click_element() + get_network_log() 캡처
+3. 발견된 요소의 코드 추적 (공통 원칙 A~D 적용)
 
 4. cart_view: 상품 담기 후 get_network_log()에서 조회 API 자동 캡처
    또는 iframe src URL이 곧 cart_view URL
@@ -289,14 +301,19 @@ B) ajax_urls에 장바구니 URL 없으면 → form 방식
 5. 없는 기능: cart_clear 없으면 생략 (코드가 폴백 자동 수행)
 ```
 
-### STEP 5: 매출원장 확인
+### STEP 5: 매출원장
 
 ```
-1. STEP 2의 all_links에서 "매출원장" 텍스트의 href 확인
-2. 있으면: open_site(href) → 매출원장 페이지 이동
-3. analyze_page_for_recipe("sales_ledger") → 날짜 필드, 폼 구조 확인
-4. 조회 실행 → get_network_log() → URL + 파라미터 캡처
-5. 결과 테이블 헤더에서 필드 매핑 (일자, 제품명, 수량, 단가, 매출, 잔액)
+1. STEP 2의 all_links에서 "매출원장" 링크 발견 → href 확인
+2. click_element()로 해당 링크 클릭 → 페이지 이동
+3. snapshot_page()로 매출원장 페이지 UI 확인:
+   - 날짜 입력 필드 (sDate, eDate 등)
+   - "조회" 버튼 → 코드 추적으로 API URL 확인
+   - 옵션 (일별/약품별, transgu 등)
+4. 날짜 입력 → "조회" 버튼 클릭 → get_network_log()로 실제 API 캡처
+5. 결과 확인:
+   - execute_js로 테이블 헤더 확인 (일자, 제품명, 수량, 단가, 매출, 잔액)
+   - JSON 응답이면 필드 매핑 확인
 ```
 
 ### STEP 6: 레시피 JSON 작성 + E2E 검증
