@@ -765,6 +765,16 @@ class SiteExecutor:
         """장바구니 전체 비우기"""
         cart_clear = self._get_step('cart_clear')
         if not cart_clear:
+            # 폴백: cart_view → delete_from_cart 반복
+            if self._get_step('cart_view') and self._get_step('cart_delete'):
+                items = self.view_cart()
+                if not items:
+                    return True
+                ok = True
+                for item in items:
+                    if item.product_code:
+                        ok = self.delete_from_cart(item.product_code) and ok
+                return ok
             logger.warning(f"[{self.site_id}] cart_clear 레시피 없음")
             return False
 
