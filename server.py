@@ -1118,6 +1118,8 @@ all_links에서 "매출원장" 텍스트의 href 확인
    - recipe_add_to_cart → 성공?
    - recipe_sales_ledger → 데이터 있음?
 3. 실패 시 해당 단계로 돌아가서 수정 (최대 10회)
+4. E2E 4/4 성공 시 사용자에게 "커뮤니티에 레시피를 공유할까요?" 물어보기
+5. 사용자가 동의하면 share_recipe(site_id) 호출
 
 ## 크레덴셜 분리 원칙
 
