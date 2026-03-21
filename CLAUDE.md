@@ -264,6 +264,30 @@ B) ajax_urls에 장바구니 URL 없으면 → form 방식
    - form_name, product_code_prefix, quantity_prefix 확정
 ```
 
+### STEP 4.5: 장바구니 관리 API 탐색
+
+```
+cart_add가 확정된 후, 장바구니 조회/삭제/비우기 API를 찾는다.
+
+1. cart_view:
+   - ajax_urls에서 "Cart", "Bag", "basket" 포함 URL → 조회 API
+   - form 사이트: iframe src에서 Bag.asp URL
+   - JSON API: basketList GET 엔드포인트
+   - 상품 1개 담기 → 조회 API 호출 → 응답 파싱 구조 확인
+
+2. cart_delete:
+   - AJAX: ajax_urls에서 "del", "DataCart/del" URL
+   - form: 장바구니 JS(Bag.js)에서 삭제 함수 → execute_js로 소스 확인
+   - SPA: 삭제 아이콘 클릭 → get_network_log()로 캡처
+   - AngularJS: ng-click에서 함수명 → JS에서 실제 URL 추출
+
+3. cart_clear:
+   - "장바구니 비우기", "전체삭제" 버튼/링크 확인
+   - form: "BagOrder.asp?kind=del" 패턴
+   - AJAX: ajax_urls에서 "alldel" URL
+   - 없으면: cart_view + cart_delete 반복으로 폴백 (코드에 이미 구현됨)
+```
+
 ### STEP 5: 매출원장 확인
 
 ```
@@ -279,11 +303,14 @@ B) ajax_urls에 장바구니 URL 없으면 → form 방식
 ```
 1. 위 분석 결과를 종합하여 레시피 JSON 직접 작성
 2. save_recipe(site_id, recipe_json, overwrite=True)
-3. E2E 검증 (4가지 모두 성공해야 함):
+3. E2E 검증 (7가지):
    - recipe_login(site_id, user, pass) → 성공?
    - recipe_search(site_id, "타이레놀") → 결과 있음?
    - recipe_add_to_cart(site_id, product_code, 1) → 성공?
+   - recipe_view_cart(site_id) → 방금 담은 상품 보임?
+   - recipe_delete_from_cart 또는 recipe_clear_cart → 삭제 성공?
    - recipe_sales_ledger(site_id, period="1m") → 데이터 있음?
+   - 전체 통과 시 → 사용자에게 공유 여부 물어보기 → share_recipe()
 4. 실패 시: 해당 단계로 돌아가서 분석 재실행 → 레시피 수정
 5. 최대 10회 반복
 ```

@@ -1150,21 +1150,59 @@ A) js_handlers.ajax_urls에 /DataCart/ 또는 /cart/add 있으면 → API 방식
    execute_js로 해당 함수 소스 확인하여 payload 파악
 B) ajax_urls 비어있으면 → form 방식 (frmOrder 폼 제출)
 
+## STEP 4.5: 장바구니 관리 API 탐색
+
+cart_add가 확정된 후, 장바구니 조회/삭제/비우기 API를 찾는다.
+
+### cart_view (장바구니 조회):
+- STEP 2의 ajax_urls에서 "Cart", "Bag", "basket", "PartialProductCart" 포함 URL
+- form 사이트: snapshot_page()의 iframe src에서 Bag.asp URL
+- JWT 사이트: ajax_urls 또는 네트워크 로그에서 basketList GET 엔드포인트
+- AngularJS: ajax_urls 또는 /ajax/bag.asp?mode=list
+- 상품 1개 담기 → 조회 API 호출 → 응답 구조 확인 (HTML 테이블 or JSON 배열)
+
+### cart_delete (개별 삭제):
+- AJAX 사이트: ajax_urls에서 "del", "DataCart/del" URL
+- form 사이트: 장바구니 JS(Bag.js 등)에서 삭제 함수 확인
+  → execute_js로 JS 파일 fetch → "btn_delete", "Bag_Del" 등 함수 소스 추출
+  → 실제 URL + 파라미터 확인 (BagOrder.asp?kind=multiupdbag&actflag=DEL 등)
+- SPA(JWT): 삭제 아이콘 클릭 → get_network_log()로 DELETE 요청 캡처
+- AngularJS: ng-click에서 삭제 함수명 → JS에서 AJAX URL 추출
+
+### cart_clear (전체 비우기):
+- "장바구니 비우기", "전체삭제" 버튼/링크 확인
+- form 사이트: "BagOrder.asp?kind=del" 패턴
+- AJAX: ajax_urls에서 "alldel" URL, 또는 "전체삭제" 버튼의 onclick 확인
+- AngularJS: "Bag_DeleteAll" 함수 → JS에서 mode=delall 등 확인
+- 없으면: cart_view + cart_delete 반복으로 폴백 가능 (코드에 이미 구현됨)
+
 ## STEP 5: 매출원장
 
 all_links에서 "매출원장" 텍스트의 href 확인
-있으면 페이지 이동 → 날짜 필드, 조회 API 캡처
+있으면:
+1. 해당 페이지로 이동
+2. analyze_page_for_recipe("sales_ledger") → 날짜 필드, 폼 구조 확인
+3. 기간 설정 후 조회 실행 → get_network_log() → URL + 파라미터 캡처
+4. 결과 테이블 구조 확인 (HTML 셀렉터 or JSON 필드 매핑)
+5. 날짜 포맷 확인 (YYYY-MM-DD or YYYYMMDD)
 
 ## STEP 6: 레시피 JSON 작성 + E2E 검증
 
 1. save_recipe(site_id, recipe_json, overwrite=True)
-2. E2E 검증 4가지:
+   필수 섹션: login, search, cart_add, cart_view
+   권장 섹션: cart_delete, cart_clear, sales_ledger, search.pagination
+
+2. E2E 검증 7가지:
    - recipe_login → 성공?
    - recipe_search → 결과 있음?
    - recipe_add_to_cart → 성공?
+   - recipe_view_cart → 방금 담은 상품 보임?
+   - recipe_delete_from_cart 또는 recipe_clear_cart → 삭제/비우기 성공?
    - recipe_sales_ledger → 데이터 있음?
+   - 전체 통과 시 공유 여부 물어보기
+
 3. 실패 시 해당 단계로 돌아가서 수정 (최대 10회)
-4. E2E 4/4 성공 시 사용자에게 "커뮤니티에 레시피를 공유할까요?" 물어보기
+4. E2E 성공 시 사용자에게 "커뮤니티에 레시피를 공유할까요?" 물어보기
 5. 사용자가 동의하면 share_recipe(site_id) 호출
 
 ## 크레덴셜 분리 원칙
@@ -1180,8 +1218,9 @@ def recipe_json_schema() -> str:
     """레시피 JSON 형식 가이드. 레시피 작성 시 참고하세요."""
     return """# 레시피 JSON 스키마
 
-## 필수 섹션: login, search, cart_add
-## 선택 섹션: sales_ledger, order_submit, search.pagination
+## 필수 섹션: login, search, cart_add, cart_view
+## 권장 섹션: cart_delete, cart_clear, sales_ledger, search.pagination
+## 선택 섹션: order_submit
 
 ## login
 ```json
@@ -1271,6 +1310,49 @@ form 방식:
 }
 ```
 
+## cart_view (장바구니 조회)
+```json
+{
+  "method": "GET",
+  "url": "/Service/Order/Bag.asp",
+  "params": {"currVenCd": "{VEN_CD}"},
+  "response_type": "html",
+  "parsing": {
+    "selector": "tr[id^=bagLine]",
+    "fields": {
+      "product_name": {"selector": "td.td_nm a", "attribute": "text"},
+      "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
+      "quantity": {"selector": "input[name^=bagQty_]", "attribute": "value"},
+      "unit_price": {"selector": "input[name^=price_]", "attribute": "value"},
+      "bag_num": {"selector": "input[name^=bag_num_]", "attribute": "value"}
+    }
+  }
+}
+```
+JSON API 사이트: response_type: "json" + json_mapping 사용.
+
+## cart_delete (개별 삭제)
+```json
+{
+  "method": "GET",
+  "url": "/ajax/bag.asp",
+  "params": {"mode": "del", "code": "{PRODUCT_CODE}"},
+  "success_indicator": {"type": "json_field", "path": "retCode", "value": "0000"}
+}
+```
+DELETE 메서드도 지원. SPA는 DELETE /ord/deleteComOrdBasket?saveItemCd={PRODUCT_CODE}
+form 사이트에서 requires_cart_view: true면 cart_view에서 bag_num 등을 가져와서 orderNum 구성.
+
+## cart_clear (전체 비우기)
+```json
+{
+  "method": "GET",
+  "url": "/Service/Order/BagOrder.asp",
+  "params": {"kind": "del", "currVenCd": "{VEN_CD}"}
+}
+```
+cart_clear가 없으면 자동으로 cart_view → cart_delete 반복으로 폴백.
+
 ## success_indicator 타입
 - cookie: 특정 쿠키 존재
 - status_code: HTTP 상태 코드
@@ -1294,36 +1376,44 @@ def site_type_guide() -> str:
 ## 유형 A: 전통 form POST (복산나이스팜, 우정약품)
 - forms 있음, ajax_urls 비어있음
 - 쿠키 인증, form action이 곧 API URL
-- 장바구니: cart_add.type = "form"
-- 상품코드: input[name^=pc_]
+- cart_add: type="form" (frmOrder 폼 제출)
+- cart_view: GET Bag.asp (iframe HTML), 셀렉터 tr[id^=bagLine]
+- cart_delete: Bag.js에서 btn_delete 핸들러 확인 → BagOrder.asp?kind=multiupdbag&actflag=DEL&orderNum=...
+  (orderNum = bag_num|product_code|stock_cd|qty, cart_view에서 bag_num 필요)
+- cart_clear: GET BagOrder.asp?kind=del&currVenCd={VEN_CD}
 
 ## 유형 B: AJAX 하이브리드 (지오웹 BPM)
 - forms 있음, ajax_urls에 /DataCart/, /PartialSearchProduct 등
 - 쿠키 인증, AJAX POST로 검색/장바구니
-- 장바구니: REST API (/Home/DataCart/add)
-- 상품코드: hidden div (div.div-product-detail ul li:first-child)
-- 가격: 검색 목록에 없음, 상품 클릭 후 상세 패널에만 있음
+- cart_add: POST /Home/DataCart/add
+- cart_view: POST /Home/PartialProductCart (HTML), 셀렉터 tr.tr_cart_list
+- cart_delete: POST /Home/DataCart/del (productCode, moveCode, orderQty=0)
+- cart_clear: POST /Home/DataCart/alldel
 
 ## 유형 C: SPA + JWT (백제약품)
 - forms 비어있음, 로그인 후 쿠키 없음
 - JWT Bearer 토큰 인증 (Authorization 헤더)
-- 검색: GET JSON API
-- 장바구니: POST JSON API
-- login.token 섹션 필수 (path, header, prefix, user_data_path)
-- 로그인 응답의 userData에서 custCd, userId 등 추출 → 이후 API에 변수로 사용
+- cart_add: POST /ord/addBasket (JSON)
+- cart_view: GET /ord/basketList?custCd={CUST_CD}&basketGbCd=01 (JSON 배열)
+- cart_delete: DELETE /ord/deleteComOrdBasket?saveItemCd={code}&custCd=... (DELETE 메서드!)
+- cart_clear: cart_delete 반복으로 폴백
 
 ## 유형 D: AngularJS + 쿠키 (세화약품)
 - forms 비어있음, external_js에 angular 있음, 쿠키 있음
 - Playwright fill이 Angular 모델을 업데이트 안 할 수 있음
-  → execute_js로 scope에 직접 값 설정:
-  angular.element(document.querySelector('[data-ng-controller]')).scope()
-- 검색: GET JSON API (/common/ajax/physic.asp)
-- 장바구니: POST (/common/ajax/bag.asp)
+  → execute_js로 scope에 직접 값 설정
+- cart_add: POST /ajax/bag.asp (mode=add)
+- cart_view: GET /ajax/bag.asp?mode=list (JSON)
+- cart_delete: GET /ajax/bag.asp?mode=del&code={product_code}
+- cart_clear: GET /ajax/bag.asp?mode=delall
+- 삭제 함수: ng-click="Bag_Del(item)" → order.js에서 실제 URL 확인
 
 ## SPA 사이트에서 API 찾는 방법
 1. open_site → fill_input → click(버튼) → get_network_log()
 2. execute_js로 함수 소스 확인: AddCart.toString(), ProcessCart.toString()
 3. jsf_com_GetAjax 같은 래퍼 함수 안에 실제 API URL이 숨어있을 수 있음
+4. 삭제 아이콘 클릭 → get_network_log()로 DELETE/POST 캡처
+5. AngularJS: ng-click 속성에서 함수명 → JS 파일에서 실제 URL 추출
 """
 
 
