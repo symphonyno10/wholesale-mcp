@@ -42,7 +42,9 @@
     "product_detail": {
       "method": "POST",
       "url": "https://bpm.geoweb.kr/Home/PartialProductInfo/{PRODUCT_CODE}",
-      "payload": {"num": "{STOCK_QUANTITY}"},
+      "payload": {
+        "num": "{STOCK_QUANTITY}"
+      },
       "response_type": "html",
       "unit_price_selector": "#div_product_price ul li:nth-child(3)",
       "notes": "검색 목록에 가격 없음. 상품 클릭 시 제품정보 패널에서 주문단가 확인."
@@ -115,5 +117,15 @@
   "connection": {
     "request_interval_ms": 500,
     "timeout_ms": 15000
+  },
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": true,
+    "sales_ledger": true,
+    "pagination": false
   }
 }

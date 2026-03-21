@@ -153,9 +153,12 @@ auto_login_all()
 
 ### 검색/주문/매출원장 (일상 사용)
 
+**중요: list_sites()의 available_features를 확인하고 사용 가능한 기능만 호출할 것.**
+예: cart_delete가 false인 사이트에서는 recipe_delete_from_cart를 호출하지 않는다.
+
 사용자가 "타이레놀 검색해줘"라고 하면:
 ```
-1. list_sites() → 등록 사이트 + 로그인 상태 확인
+1. list_sites() → 등록 사이트 + available_features + 로그인 상태 확인
 2. logged_in=false인 사이트 있으면 → auto_login_all()
 3. recipe_search(site_id, "타이레놀") → 결과 표시
 4. recipe_add_to_cart(site_id, product_code, qty) → 장바구니 추가
@@ -348,8 +351,11 @@ auto_login_all()
    - recipe_delete_from_cart 또는 recipe_clear_cart → 삭제 성공?
    - recipe_sales_ledger(site_id, period="1m") → 데이터 있음?
    - 전체 통과 시 → 사용자에게 공유 여부 물어보기 → share_recipe()
-4. 실패 시: 해당 단계로 돌아가서 분석 재실행 → 레시피 수정
-5. 최대 10회 반복
+4. E2E 결과를 기반으로 available_features를 레시피에 기록:
+   - 각 기능(login, search, cart_add, cart_view, cart_delete, cart_clear, sales_ledger, pagination)의 성공 여부를 true/false로 기록
+   - AI는 이후 이 레시피를 사용할 때 available_features를 확인하고 사용 가능한 기능만 호출한다
+5. 실패 시: 해당 단계로 돌아가서 분석 재실행 → 레시피 수정
+6. 최대 10회 반복
 ```
 
 ### 레시피 JSON 형식 참고

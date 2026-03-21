@@ -287,14 +287,22 @@ def list_sites() -> str:
     creds = _load_credentials()
     sites = []
     for sid, r in recipes.items():
+        # available_features가 레시피에 있으면 사용, 없으면 섹션 유무로 판단
+        af = r.get("available_features", {})
         sites.append({
             "site_id": sid,
             "name": r.get("site_name", ""),
             "url": r.get("site_url", ""),
-            "has_login": "login" in r,
-            "has_search": "search" in r,
-            "has_cart": "cart_add" in r,
-            "has_sales_ledger": "sales_ledger" in r,
+            "available_features": {
+                "login": af.get("login", "login" in r),
+                "search": af.get("search", "search" in r),
+                "cart_add": af.get("cart_add", "cart_add" in r),
+                "cart_view": af.get("cart_view", "cart_view" in r),
+                "cart_delete": af.get("cart_delete", "cart_delete" in r),
+                "cart_clear": af.get("cart_clear", "cart_clear" in r),
+                "sales_ledger": af.get("sales_ledger", "sales_ledger" in r),
+                "pagination": af.get("pagination", "pagination" in r.get("search", {})),
+            },
             "has_credentials": sid in creds,
             "logged_in": sid in _executors and _executors[sid].is_authenticated(),
         })

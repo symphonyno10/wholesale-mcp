@@ -1,255 +1,142 @@
 {
-  "recipe_version": 4,
-  "site_url": "https://wos.nicepharm.com",
   "site_id": "wos_nicepharm_com",
-  "site_name": "(주)복산나이스팜",
+  "site_name": "복산나이스",
+  "site_url": "https://wos.nicepharm.com",
   "encoding": "utf-8",
-  "analyzed_by": "playwright-analyzer",
-  "analyzed_at": "2026-03-20T07:34:46.468974+00:00",
-  "enhanced_at": "2026-03-21T09:00:00.000000+00:00",
-  "test_status": "verified",
-  "test_results": {
-    "login": "success",
-    "search": "success",
-    "cart_add": "success",
-    "last_tested": "2026-03-21T09:00:00.000000+00:00",
-    "success_rate": "100%"
-  },
-  "fingerprint": {
-    "hostname": "wos.nicepharm.com",
-    "framework": "asp-classic",
-    "js_bundle_hashes": [],
-    "css_bundle_hashes": [
-      "Reset",
-      "20250724",
-      "Main9"
-    ],
-    "login_field_names": [
-      "chkSaveId",
-      "tx_id",
-      "tx_pw"
-    ],
-    "page_title": "(주)복산나이스에 오신것을 환영합니다"
-  },
-  "connection": {
-    "pre_login_get": true,
-    "request_interval_ms": 500,
-    "ssl_verify": true
-  },
+  "recipe_version": "1.0",
   "login": {
-    "method": "POST",
     "url": "https://wos.nicepharm.com/Common/Certify/Login.asp",
+    "method": "POST",
     "payload": {
-      "tx_id": "{USERNAME}",
-      "tx_pw": "{PASSWORD}",
-      "x": "49",
-      "y": "39"
+      "tx_id": "{username}",
+      "tx_pw": "{password}"
     },
-    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "cookie",
       "key": "wos"
     }
   },
   "search": {
-    "method": "POST",
     "url": "https://wos.nicepharm.com/Service/Order/Order.asp",
+    "method": "POST",
     "params": {
+      "tx_physic": "{keyword}",
       "so": "0",
       "so2": "0",
+      "tx_ven": "{VEN_CD}",
+      "sv": "{VEN_CD}",
+      "currVenNm": "{VEN_NM}",
       "currMkind": "U",
-      "tx_physic": "{KEYWORD}",
-      "sa": "phy",
-      "tx_maker": ""
-    },
-    "edi_params": {
-      "so": "0",
-      "so2": "0",
-      "currMkind": "U",
-      "tx_physic": "{EDI_CODE}",
-      "sa": "phy",
-      "tx_maker": ""
+      "currStockCd": "10001",
+      "UserDef001": "02"
     },
     "response_type": "html",
-    "content_type": "application/x-www-form-urlencoded",
+    "parsing": {
+      "row_selector": "#frmOrder .wrap_table table.tbl_list tbody tr",
+      "fields": {
+        "product_code": {
+          "selector": "input[name^=pc_]",
+          "attribute": "value"
+        },
+        "product_name": "td:nth-child(3)",
+        "manufacturer": "td:nth-child(2)",
+        "specification": "td:nth-child(4)",
+        "category": "td:nth-child(5)",
+        "price": {
+          "selector": "input[name^=price_]",
+          "attribute": "value"
+        },
+        "stock": "td:nth-child(8)"
+      }
+    },
     "pagination": {
       "type": "html_links",
       "paging_selector": "div.paging a",
       "page_url_param": "Page",
       "method_override": "GET",
       "max_pages": 5
-    },
-    "parsing": {
-      "selector": "tr.ln_physic",
-      "fields": {
-        "edi_code": {
-          "selector": "td:nth-child(1)",
-          "attribute": "text"
-        },
-        "manufacturer": {
-          "selector": "td:nth-child(2)",
-          "attribute": "text"
-        },
-        "product_name": {
-          "selector": "td:nth-child(3) a",
-          "attribute": "text"
-        },
-        "pack_unit": {
-          "selector": "td:nth-child(4)",
-          "attribute": "text"
-        },
-        "insurance_type": {
-          "selector": "td:nth-child(5) img",
-          "attribute": "alt",
-          "join": true
-        },
-        "unit_price": {
-          "selector": "td:nth-child(6)",
-          "attribute": "text"
-        },
-        "product_code": {
-          "selector": "input[name^=pc_]",
-          "attribute": "value"
-        },
-        "stock_quantity": {
-          "selector": "input[name^=stock_]",
-          "attribute": "value"
-        },
-        "price": {
-          "selector": "input[name^=price_]",
-          "attribute": "value"
-        },
-        "box_quantity": {
-          "selector": "input[name^=boxqty_]",
-          "attribute": "value"
-        },
-        "remark": {
-          "selector": "input[name^=soldoutyn_]",
-          "attribute": "value"
-        }
-      }
     }
   },
-  "utils": {
-    "pack_unit_regex": "(\\d+)\\s*(T|C|EA|P|정|캡슐|포|ml|g|vial|병|tab|cap|L)"
-  },
-  "verified": true,
-  "verified_at": "2026-03-21T09:00:00.000000+00:00",
   "cart_add": {
     "type": "form",
-    "method": "POST",
     "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
-    "form_name": "frmOrder",
+    "method": "POST",
+    "form_selector": "#frmOrder",
     "product_code_prefix": "pc_",
     "quantity_prefix": "qty_",
-    "success_indicator": {
-      "type": "status_code",
-      "value": 200
-    },
-    "notes": "검색 결과 폼에서 직접 제출. 모든 hidden 필드 포함 필수."
+    "additional_fields": {
+      "kind": "saveAll",
+      "currVenCd": "{VEN_CD}",
+      "currStockCd": "10001",
+      "userId": "{username}"
+    }
   },
   "cart_view": {
-    "method": "GET",
     "url": "https://wos.nicepharm.com/Service/Order/Bag.asp",
+    "method": "GET",
     "params": {
       "currVenCd": "{VEN_CD}",
-      "currMkind": ""
+      "currMkind": "U",
+      "currStockCd": "10001"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "tr[id^=bagLine]",
+      "row_selector": "table.tbl_list tbody tr",
       "fields": {
-        "product_name": {"selector": "td.td_nm a", "attribute": "text"},
-        "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
-        "quantity": {"selector": "input[name^=bagQty_]", "attribute": "value"},
-        "unit_price": {"selector": "input[name^=price_]", "attribute": "value"},
-        "total_price": {"selector": "td.td_num", "attribute": "text"},
-        "bag_num": {"selector": "input[name^=bag_num_]", "attribute": "value"},
-        "stock_cd": {"selector": "input[name^=stockcd_]", "attribute": "value"}
+        "product_name": "td:nth-child(2)",
+        "specification": "td:nth-child(3)",
+        "quantity": "td:nth-child(4)",
+        "price": "td:nth-child(5)"
       }
-    }
-  },
-  "cart_delete": {
-    "method": "GET",
-    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
-    "params": {
-      "kind": "multiupdbag",
-      "actflag": "DEL",
-      "currVenCd": "{VEN_CD}",
-      "currMkind": "",
-      "orderNum": "{ORDER_NUM}"
-    },
-    "requires_cart_view": true,
-    "order_num_format": "{BAG_NUM}|{PRODUCT_CODE}|{STOCK_CD}|{QUANTITY}",
-    "success_indicator": {
-      "type": "status_code",
-      "value": 200
     }
   },
   "cart_clear": {
-    "method": "GET",
     "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "method": "GET",
     "params": {
       "kind": "del",
       "currVenCd": "{VEN_CD}",
-      "currMkind": ""
-    },
-    "success_indicator": {
-      "type": "status_code",
-      "value": 200
+      "currMkind": "U"
     }
   },
-  "order_submit": {
-    "method": "POST",
-    "url": "https://wos.nicepharm.com/Service/Order/OrderSubmit.asp",
-    "notes": "주문 제출 기능 - 장바구니 페이지에서 실제 URL 확인 필요",
-    "payload": {
-      "delivery_date": "{DELIVERY_DATE}"
-    },
-    "success_indicator": {
-      "type": "contains",
-      "value": "주문이 완료"
-    },
-    "implemented": false,
-    "requires_verification": true
-  },
   "sales_ledger": {
-    "method": "GET",
     "url": "https://wos.nicepharm.com/Service/SalesLedger/SalesLedger.asp",
+    "method": "GET",
     "params": {
-      "sDate": "{START_DATE}",
-      "eDate": "{END_DATE}",
+      "sDate": "{start_date}",
+      "eDate": "{end_date}",
       "tx_ven": "{VEN_CD}",
       "sv": "{VEN_CD}",
       "currVenNm": "{VEN_NM}",
-      "transgu": "{DETAIL_MODE}",
-      "tx_physic": "{PRODUCT_FILTER}"
+      "transgu": "0"
     },
+    "date_format": "%Y-%m-%d",
     "response_type": "html",
     "parsing": {
-      "selector": "table.tbl_list tbody tr[align='right']",
+      "row_selector": "table.tbl_list tbody tr",
       "fields": {
-        "transaction_date": {"selector": "td:nth-child(2)", "attribute": "text"},
-        "product_name": {"selector": "td.td_nm", "attribute": "text"},
-        "pack_unit": {"selector": "td:nth-child(5)", "attribute": "text"},
-        "quantity": {"selector": "td:nth-child(6)", "attribute": "text"},
-        "unit_price": {"selector": "td:nth-child(7)", "attribute": "text"},
-        "sales_amount": {"selector": "td:nth-child(8)", "attribute": "text"},
-        "balance": {"selector": "td.last", "attribute": "text"}
+        "date": "td:nth-child(2)",
+        "product_name": "td:nth-child(3)",
+        "specification": "td:nth-child(4)",
+        "quantity": "td:nth-child(5)",
+        "unit_price": "td:nth-child(6)",
+        "sales_amount": "td:nth-child(7)",
+        "balance": "td:nth-child(10)"
       }
     }
   },
-  "features": {
-    "supports_edi_search": true,
-    "supports_pack_unit_parsing": true,
-    "supports_stock_check": true,
-    "supports_insurance_type": true,
-    "supports_sales_ledger": true,
-    "form_based_cart": true,
-    "encoding": "utf-8"
+  "connection": {
+    "request_interval_ms": 500,
+    "timeout_ms": 15000
   },
-  "limitations": {
-    "cart_requires_recent_search": "장바구니 추가 시 해당 상품이 포함된 검색 결과가 _last_search_html에 있어야 함",
-    "order_submit_unverified": "주문 제출 기능 미검증"
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": false,
+    "cart_clear": true,
+    "sales_ledger": true,
+    "pagination": true
   }
 }
