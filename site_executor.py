@@ -739,14 +739,23 @@ class SiteExecutor:
 
         url = self._get_url(cart_delete)
         method = cart_delete.get('method', 'POST')
-        payload = cart_delete.get('payload', {})
-        data = self._resolve_payload(payload, {
-            'PRODUCT_CODE': product_code, 'product_code': product_code
-        })
+        variables = {'PRODUCT_CODE': product_code, 'product_code': product_code}
 
         try:
-            resp = self._make_request(method=method, url=url,
-                                     content_type=cart_delete.get('content_type'), data=data)
+            if method.upper() == 'GET':
+                params = cart_delete.get('params', {})
+                data = self._resolve_payload(params, variables) if params else None
+                full_url = self._build_url(url)
+                self._throttle()
+                resp = self.session.get(full_url, params=data, timeout=30)
+                if self._encoding and self._encoding.lower() != 'utf-8':
+                    resp.encoding = self._encoding
+                resp.raise_for_status()
+            else:
+                payload = cart_delete.get('payload', {})
+                data = self._resolve_payload(payload, variables)
+                resp = self._make_request(method=method, url=url,
+                                         content_type=cart_delete.get('content_type'), data=data)
             return self._check_success(resp, cart_delete.get('success_indicator', {}))
         except Exception as e:
             logger.error(f"[{self.site_id}] 장바구니 삭제 에러: {e}")

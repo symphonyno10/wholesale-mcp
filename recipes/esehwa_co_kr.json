@@ -89,7 +89,9 @@
     "method": "GET",
     "url": "https://www.esehwa.co.kr/common/ajax/bag.asp",
     "params": {
-      "mode": "list"
+      "mode": "list",
+      "ug": "",
+      "orderFlag": "1"
     },
     "response_type": "json",
     "json_mapping": {
@@ -104,13 +106,14 @@
     }
   },
   "cart_delete": {
-    "method": "POST",
+    "method": "GET",
     "url": "https://www.esehwa.co.kr/common/ajax/bag.asp",
-    "payload": {
+    "params": {
       "mode": "del",
-      "physicCds": "{PRODUCT_CODE}"
+      "code": "{PRODUCT_CODE}",
+      "ug": "",
+      "orderFlag": "1"
     },
-    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "retCode",
@@ -118,12 +121,13 @@
     }
   },
   "cart_clear": {
-    "method": "POST",
+    "method": "GET",
     "url": "https://www.esehwa.co.kr/common/ajax/bag.asp",
-    "payload": {
-      "mode": "allDel"
+    "params": {
+      "mode": "delall",
+      "ug": "",
+      "orderFlag": "1"
     },
-    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "retCode",
