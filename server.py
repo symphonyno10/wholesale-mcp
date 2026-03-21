@@ -1322,5 +1322,8 @@ def resource_credentials_template() -> str:
 
 # ── 엔트리포인트 ──
 
-if __name__ == "__main__":
+def main():
     mcp.run(transport="stdio")
+
+if __name__ == "__main__":
+    main()

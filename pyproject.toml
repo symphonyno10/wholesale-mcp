@@ -5,8 +5,21 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "wholesale-mcp"
 version = "1.0.0"
-description = "MCP server for wholesale pharmacy site automation - browse, analyze, and order"
+description = "MCP server for wholesale pharmacy site automation - login, search, cart, sales ledger"
+readme = "README.md"
+license = {text = "MIT"}
 requires-python = ">=3.10"
+authors = [
+    {name = "symphonyno10"}
+]
+keywords = ["mcp", "wholesale", "pharmacy", "automation", "playwright"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business",
+]
 dependencies = [
     "mcp>=1.0.0",
     "playwright>=1.40.0",
@@ -14,5 +27,15 @@ dependencies = [
     "beautifulsoup4>=4.12.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/symphonyno10/wholesale-mcp"
+Repository = "https://github.com/symphonyno10/wholesale-mcp"
+
 [project.scripts]
-wholesale-mcp = "server:mcp.run"
+wholesale-mcp = "server:main"
+
+[tool.setuptools]
+py-modules = ["server", "site_executor", "browser_engine", "recipe_normalizer", "recipe_schema"]
+
+[tool.setuptools.package-data]
+"*" = ["recipes/*.json", "recipes.example/*.json", "credentials.example.json"]
