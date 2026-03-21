@@ -1,12 +1,16 @@
 {
   "site_id": "bpm_geoweb_kr",
-  "site_name": "지오영",
+  "site_name": "지오웹(지오영)",
   "site_url": "https://bpm.geoweb.kr",
   "encoding": "utf-8",
   "recipe_version": "1.0",
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
   "login": {
-    "url": "https://bpm.geoweb.kr/Member/Login",
     "method": "POST",
+    "url": "/Member/Login",
     "payload": {
       "LoginID": "{username}",
       "Password": "{password}"
@@ -17,43 +21,39 @@
     }
   },
   "search": {
-    "url": "https://bpm.geoweb.kr/Home/PartialSearchProduct",
     "method": "POST",
+    "url": "/Home/PartialSearchProduct",
     "params": {
-      "srchText": "{keyword}",
       "srchCate": "",
       "prdtType": "",
       "prdOrder": "3",
+      "srchText": "{keyword}",
       "srchCompany": "",
       "startdate": "",
       "enddate": ""
     },
     "response_type": "html",
     "parsing": {
-      "row_selector": "tr.tr-product-list",
+      "selector": "tr.tr-product-list",
       "fields": {
-        "product_code": "div.div-product-detail ul li:first-child",
+        "product_code": {
+          "selector": ".div-product-detail ul li:first-child",
+          "attribute": "text"
+        },
         "product_name": "td.proName",
         "manufacturer": "td.phaCompany span",
-        "specification": "td.standard",
-        "stock": "td.stock span"
+        "pack_unit": "td.standard",
+        "stock_quantity": "td.stock span",
+        "remark": {
+          "selector": ".div-product-detail ul li:nth-child(8)",
+          "attribute": "text"
+        }
       }
-    },
-    "product_detail": {
-      "method": "POST",
-      "url": "https://bpm.geoweb.kr/Home/PartialProductInfo/{PRODUCT_CODE}",
-      "payload": {
-        "num": "{STOCK_QUANTITY}"
-      },
-      "response_type": "html",
-      "unit_price_selector": "#div_product_price ul li:nth-child(3)",
-      "notes": "검색 목록에 가격 없음. 상품 클릭 시 제품정보 패널에서 주문단가 확인."
     }
   },
   "cart_add": {
-    "type": "api",
-    "url": "https://bpm.geoweb.kr/Home/DataCart/add",
     "method": "POST",
+    "url": "/Home/DataCart/add",
     "payload": {
       "productCode": "{product_code}",
       "moveCode": "",
@@ -66,57 +66,75 @@
     }
   },
   "cart_view": {
-    "url": "https://bpm.geoweb.kr/Home/PartialProductCart",
     "method": "POST",
+    "url": "/Home/PartialProductCart",
     "response_type": "html",
     "parsing": {
-      "row_selector": "table tbody tr",
+      "selector": "tr.tr_cart_list",
       "fields": {
+        "product_code": {
+          "selector": ".div_cart_detail ul li:first-child",
+          "attribute": "text"
+        },
         "product_name": "td.phaCompany",
-        "quantity": "td.quantity",
-        "price": "td.unitPrice",
-        "total": "td.amountMoney"
+        "quantity": {
+          "selector": "td.quantity input",
+          "attribute": "value"
+        },
+        "unit_price": "td.unitPrice",
+        "total_price": "td.amountMoney"
       }
     }
   },
   "cart_delete": {
-    "url": "https://bpm.geoweb.kr/Home/DataCart/del",
     "method": "POST",
+    "url": "/Home/DataCart/del",
     "payload": {
       "productCode": "{product_code}",
       "moveCode": "",
       "orderQty": "0"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
     }
   },
   "cart_clear": {
-    "url": "https://bpm.geoweb.kr/Home/DataCart/delAll",
-    "method": "POST"
+    "method": "POST",
+    "url": "/Home/DataCart/alldel",
+    "payload": {
+      "productCode": "",
+      "moveCode": "",
+      "orderQty": "0"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
   },
   "sales_ledger": {
-    "url": "https://bpm.geoweb.kr/MyPage/SalesLedger",
     "method": "GET",
+    "url": "/MyPage/SalesLedger",
+    "date_format": "%Y-%m-%d",
     "params": {
       "dtpFrom": "{start_date}",
       "dtpTo": "{end_date}",
       "printFlag": "2",
       "srchFlag": ""
     },
-    "date_format": "%Y-%m-%d",
     "response_type": "html",
     "parsing": {
-      "row_selector": "table tbody tr",
+      "selector": "table tbody tr",
       "fields": {
-        "date": "td.date",
+        "transaction_date": "td.date",
         "product_name": "td.proName",
         "sales_amount": "td.salAmountMoney",
-        "deposit_amount": "td.dipAmountMoney",
+        "payment": "td.dipAmountMoney",
         "balance": "td.balance"
       }
     }
-  },
-  "connection": {
-    "request_interval_ms": 500,
-    "timeout_ms": 15000
   },
   "available_features": {
     "login": true,

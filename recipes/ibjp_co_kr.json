@@ -1,12 +1,16 @@
 {
   "site_id": "ibjp_co_kr",
   "site_name": "백제약품",
-  "site_url": "https://ibjp.co.kr",
+  "site_url": "https://www.ibjp.co.kr",
   "encoding": "utf-8",
   "recipe_version": "1.0",
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
   "login": {
-    "url": "https://www.ibjp.co.kr/jwt/login",
     "method": "POST",
+    "url": "/jwt/login",
     "content_type": "application/json",
     "payload": {
       "loginId": "{username}",
@@ -26,8 +30,8 @@
     }
   },
   "search": {
-    "url": "https://www.ibjp.co.kr/ord/itemSearch",
     "method": "GET",
+    "url": "/ord/itemSearch",
     "params": {
       "keyword": "{keyword}",
       "makerNm": "",
@@ -53,20 +57,19 @@
       "items_path": "",
       "fields": {
         "product_code": "ITEM_CD",
-        "product_name": "ITEM_NM",
+        "product_name": "ITEM_NM_UNIT",
         "manufacturer": "MAKER_NM",
         "pack_unit": "UNIT",
-        "stock_quantity": "AVAIL_STOCK",
         "unit_price": "ORD_WP2_AMT",
+        "stock_quantity": "AVAIL_STOCK",
         "edi_code": "BOHUM_CD",
         "insurance_type": "PAY_ITEM_NM"
       }
     }
   },
   "cart_add": {
-    "type": "api",
-    "url": "https://www.ibjp.co.kr/ord/addBasket",
     "method": "POST",
+    "url": "/ord/addBasket",
     "content_type": "application/json",
     "payload": {
       "basketGbCd": "01",
@@ -79,12 +82,12 @@
     },
     "success_indicator": {
       "type": "contains",
-      "value": "정상적으로 처리되었습니다"
+      "value": "정상적으로 처리"
     }
   },
   "cart_view": {
-    "url": "https://www.ibjp.co.kr/ord/basketList",
     "method": "GET",
+    "url": "/ord/basketList",
     "params": {
       "userGbCd": "{USER_GB_CD}",
       "custCd": "{CUST_CD}",
@@ -98,53 +101,9 @@
         "product_code": "ITEM_CD",
         "product_name": "ITEM_NM",
         "quantity": "ITEM_QTY",
-        "unit_price": "ORD_WP2_AMT",
-        "manufacturer": "MAKER_NM",
-        "pack_unit": "UNIT"
+        "unit_price": "ORD_WP2_AMT"
       }
     }
-  },
-  "cart_clear": {
-    "url": "https://www.ibjp.co.kr/ord/deleteBasketAll",
-    "method": "POST",
-    "content_type": "application/json",
-    "payload": {
-      "custCd": "{CUST_CD}",
-      "basketGbCd": "01"
-    }
-  },
-  "sales_ledger": {
-    "url": "https://www.ibjp.co.kr/ordLedger/listSearch",
-    "method": "GET",
-    "params": {
-      "custCd": "{CUST_CD}",
-      "custNm": "{CUST_NM}",
-      "orderVal": "0",
-      "startDt": "{start_date}",
-      "endDt": "{end_date}",
-      "searchAll": "Y",
-      "salesYn": "N",
-      "returnYn": "N",
-      "paymentYn": "N",
-      "compensationYn": "N",
-      "sortType": "Web"
-    },
-    "date_format": "%Y%m%d",
-    "response_type": "json",
-    "json_mapping": {
-      "items_path": "list",
-      "fields": {
-        "date": "APRV_DT",
-        "product_name": "ITEM_NM_UNIT",
-        "sales_amount": "TOTAL_AMT",
-        "balance": "BALANCE_A_AMT",
-        "remark": "GUBUN_NM"
-      }
-    }
-  },
-  "connection": {
-    "request_interval_ms": 500,
-    "timeout_ms": 15000
   },
   "available_features": {
     "login": true,
@@ -153,7 +112,7 @@
     "cart_view": true,
     "cart_delete": false,
     "cart_clear": false,
-    "sales_ledger": true,
+    "sales_ledger": false,
     "pagination": false
   }
 }

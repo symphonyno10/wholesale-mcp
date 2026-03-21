@@ -216,6 +216,12 @@ auto_login_all()
 5. capture_form_submission() → 실제 전송된 URL + payload 최종 확정
 6. get_cookies() → 로그인 후 새로 생긴 쿠키 = success_indicator
    - JWT 사이트: 쿠키 없음 → get_network_log()에서 토큰 응답 확인
+7. 로그인 후 팝업 처리:
+   - screenshot()으로 화면 확인 — 공지/안내/이벤트 팝업이 UI를 가리고 있는지 확인
+   - 팝업이 보이면 → snapshot_page()에서 "닫기", "확인", "오늘 하루 그만보기", "close" 버튼 찾기
+   - 해당 버튼 click_element()로 닫기
+   - 팝업이 여러 개일 수 있으므로 screenshot()으로 다시 확인 → 반복
+   - 팝업이 모두 닫힌 후에 다음 STEP 진행
 ```
 
 ### STEP 2: 메인 페이지 전체 분석

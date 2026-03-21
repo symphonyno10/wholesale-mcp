@@ -4,9 +4,13 @@
   "site_url": "https://wjwp.co.kr",
   "encoding": "utf-8",
   "recipe_version": "1.0",
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
   "login": {
-    "url": "https://wjwp.co.kr/Common/Certify/Login.asp",
     "method": "POST",
+    "url": "/Common/Certify/Login.asp",
     "payload": {
       "tx_id": "{username}",
       "tx_pw": "{password}"
@@ -17,16 +21,19 @@
     }
   },
   "search": {
-    "url": "https://wjwp.co.kr/Service/Order/Order.asp",
     "method": "GET",
+    "url": "/Service/Order/Order.asp",
     "params": {
-      "tx_physic": "{keyword}",
       "so": "0",
-      "so2": "0"
+      "so2": "0",
+      "tx_physic": "{keyword}",
+      "tx_maker": "",
+      "tx_ven": "{VEN_CD}",
+      "currVenNm": "{VEN_NM}"
     },
     "response_type": "html",
     "parsing": {
-      "row_selector": "#frmOrder .wrap_table table.tbl_list tbody tr",
+      "selector": "#frmOrder .wrap_table table tbody tr",
       "fields": {
         "product_code": {
           "selector": "input[name^=pc_]",
@@ -34,13 +41,13 @@
         },
         "product_name": "td:nth-child(3)",
         "manufacturer": "td:nth-child(2)",
-        "specification": "td:nth-child(4)",
-        "category": "td:nth-child(5)",
+        "pack_unit": "td:nth-child(4)",
         "price": {
           "selector": "input[name^=price_]",
           "attribute": "value"
         },
-        "stock": "td:nth-child(7)"
+        "stock_quantity": "td:nth-child(7)",
+        "remark": "td:nth-child(5)"
       }
     },
     "pagination": {
@@ -53,47 +60,45 @@
   },
   "cart_add": {
     "type": "form",
-    "url": "https://wjwp.co.kr/Service/Order/BagOrder.asp",
-    "method": "POST",
-    "form_selector": "#frmOrder",
+    "url": "/Service/Order/BagOrder.asp",
+    "form_name": "frmOrder",
     "product_code_prefix": "pc_",
-    "quantity_prefix": "qty_",
-    "additional_fields": {
-      "kind": "saveAll",
-      "currVenCd": "{VEN_CD}",
-      "userId": "{username}"
-    }
+    "quantity_prefix": "qty_"
   },
   "cart_view": {
-    "url": "https://wjwp.co.kr/Service/Order/Bag.asp",
     "method": "GET",
+    "url": "/Service/Order/Bag.asp",
     "params": {
       "currVenCd": "{VEN_CD}",
-      "currMkind": ""
+      "currMkind": "U"
     },
     "response_type": "html",
     "parsing": {
-      "row_selector": "table.tbl_list tbody tr",
+      "selector": "#bag_view table tbody tr",
       "fields": {
         "product_name": "td:nth-child(2)",
-        "specification": "td:nth-child(3)",
-        "quantity": "td:nth-child(4)",
-        "price": "td:nth-child(5)"
+        "quantity": "td:nth-child(3)",
+        "total_price": "td:nth-child(4)"
       }
     }
   },
   "cart_clear": {
-    "url": "https://wjwp.co.kr/Service/Order/BagOrder.asp",
     "method": "GET",
+    "url": "/Service/Order/BagOrder.asp",
     "params": {
       "kind": "del",
       "currVenCd": "{VEN_CD}",
-      "currMkind": ""
+      "currMkind": "U"
+    },
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
     }
   },
   "sales_ledger": {
-    "url": "https://wjwp.co.kr/Service/SalesLedger/SalesLedger.asp",
     "method": "GET",
+    "url": "/Service/SalesLedger/SalesLedger.asp",
+    "date_format": "%Y-%m-%d",
     "params": {
       "sDate": "{start_date}",
       "eDate": "{end_date}",
@@ -102,24 +107,7 @@
       "currVenNm": "{VEN_NM}",
       "transgu": "0"
     },
-    "date_format": "%Y-%m-%d",
-    "response_type": "html",
-    "parsing": {
-      "row_selector": "table.tbl_list tbody tr",
-      "fields": {
-        "date": "td:nth-child(2)",
-        "product_name": "td:nth-child(3)",
-        "specification": "td:nth-child(4)",
-        "quantity": "td:nth-child(5)",
-        "unit_price": "td:nth-child(6)",
-        "sales_amount": "td:nth-child(7)",
-        "balance": "td:nth-child(10)"
-      }
-    }
-  },
-  "connection": {
-    "request_interval_ms": 500,
-    "timeout_ms": 15000
+    "response_type": "html"
   },
   "available_features": {
     "login": true,
