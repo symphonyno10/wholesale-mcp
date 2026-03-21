@@ -89,13 +89,15 @@ class OrderResult:
 @dataclass
 class CartItem:
     """장바구니 항목"""
-    site_id: str
-    product_code: str
-    product_name: str
+    site_id: str = ''
+    product_code: str = ''
+    product_name: str = ''
     edi_code: str = ''
     unit: int = 0
     quantity: int = 1
     unit_price: float = 0.0
+    total_price: float = 0.0
+    raw_data: dict = field(default_factory=dict)
 
 
 def validate_recipe(recipe: dict) -> tuple[bool, str]:

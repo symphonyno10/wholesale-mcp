@@ -148,6 +148,52 @@
     },
     "notes": "검색 결과 폼에서 직접 제출. 모든 hidden 필드 포함 필수."
   },
+  "cart_view": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/Order/Bag.asp",
+    "params": {
+      "currVenCd": "{VEN_CD}",
+      "currMkind": ""
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "tr.bag",
+      "fields": {
+        "product_name": {"selector": "td.bag_nm", "attribute": "text"},
+        "product_code": {"selector": "input[name^=pc_]", "attribute": "value"},
+        "quantity": {"selector": "input[name^=qty_]", "attribute": "value"},
+        "unit_price": {"selector": "td.bag_price", "attribute": "text"},
+        "total_price": {"selector": "td.bag_tot", "attribute": "text"}
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "POST",
+    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "payload": {
+      "kind": "delOne",
+      "pc": "{PRODUCT_CODE}",
+      "currVenCd": "{VEN_CD}"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
+    }
+  },
+  "cart_clear": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "params": {
+      "kind": "del",
+      "currVenCd": "{VEN_CD}",
+      "currMkind": ""
+    },
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
+    }
+  },
   "order_submit": {
     "method": "POST",
     "url": "https://wos.nicepharm.com/Service/Order/OrderSubmit.asp",

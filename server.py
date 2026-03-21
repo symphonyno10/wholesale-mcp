@@ -383,6 +383,52 @@ def recipe_add_to_cart(site_id: str, product_code: str, quantity: int) -> str:
 
 
 @mcp.tool()
+def recipe_view_cart(site_id: str) -> str:
+    """장바구니 내역 조회. 현재 담겨있는 상품 목록을 반환합니다."""
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    items = executor.view_cart()
+    return json.dumps([{
+        "product_code": item.product_code,
+        "product_name": item.product_name,
+        "quantity": item.quantity,
+        "unit_price": item.unit_price,
+        "total_price": item.total_price,
+    } for item in items], ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
+    """장바구니에서 특정 상품 삭제"""
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    ok = executor.delete_from_cart(product_code)
+    return json.dumps({
+        "success": ok,
+        "site_id": site_id,
+        "product_code": product_code,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def recipe_clear_cart(site_id: str) -> str:
+    """장바구니 전체 비우기"""
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    ok = executor.clear_cart()
+    return json.dumps({
+        "success": ok,
+        "site_id": site_id,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
 def get_session_info(site_id: str) -> str:
     """SiteExecutor 세션 상태 조회 (쿠키, 인증 여부, 헤더)"""
     executor = _executors.get(site_id)

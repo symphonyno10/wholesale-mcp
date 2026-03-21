@@ -79,6 +79,52 @@
       "value": "1"
     }
   },
+  "cart_view": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Home/PartialProductCart",
+    "response_type": "html",
+    "content_type": "application/x-www-form-urlencoded",
+    "parsing": {
+      "selector": "tr.tr_cart_list",
+      "fields": {
+        "product_name": {"selector": "td.phaCompany", "attribute": "text"},
+        "quantity": {"selector": "input.inp_cart_modify", "attribute": "value"},
+        "unit_price": {"selector": "td.unitPrice", "attribute": "text"},
+        "total_price": {"selector": "td.amountMoney", "attribute": "text"},
+        "product_code": {"selector": "div.div_cart_detail ul li:first-child", "attribute": "text"}
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/remove",
+    "payload": {
+      "productCode": "{PRODUCT_CODE}",
+      "moveCode": "",
+      "orderQty": "0"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
+  "cart_clear": {
+    "method": "POST",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/alldel",
+    "payload": {
+      "productCode": "",
+      "moveCode": "",
+      "orderQty": "0"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
   "sales_ledger": {
     "method": "GET",
     "url": "https://bpm.geoweb.kr/MyPage/SalesLedger",

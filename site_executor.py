@@ -13,7 +13,7 @@ import requests
 from bs4 import BeautifulSoup
 
 from datetime import date, timedelta
-from recipe_schema import WholesaleProduct, OrderResult, SalesLedgerEntry
+from recipe_schema import WholesaleProduct, OrderResult, SalesLedgerEntry, CartItem
 from recipe_normalizer import normalize_recipe
 
 logger = logging.getLogger(__name__)
@@ -648,6 +648,135 @@ class SiteExecutor:
         matches = re.findall(regex, str(pack_str), re.IGNORECASE)
         units = sorted([int(m[0]) for m in matches], reverse=True)
         return units if units else []
+
+    # ─── 장바구니 조회/삭제 ──────────────────────────────────
+
+    def view_cart(self) -> list[CartItem]:
+        """장바구니 내역 조회"""
+        cart_view = self._get_step('cart_view')
+        if not cart_view:
+            logger.warning(f"[{self.site_id}] cart_view 레시피 없음")
+            return []
+
+        url = self._get_url(cart_view)
+        method = cart_view.get('method', 'GET')
+        params = cart_view.get('params', {})
+        data = self._resolve_payload(params, {}) if params else None
+
+        try:
+            if method.upper() == 'GET':
+                full_url = self._build_url(url)
+                self._throttle()
+                resp = self.session.get(full_url, params=data, timeout=30)
+                if self._encoding and self._encoding.lower() != 'utf-8':
+                    resp.encoding = self._encoding
+                resp.raise_for_status()
+            else:
+                resp = self._make_request(method=method, url=url,
+                                         content_type=cart_view.get('content_type'), data=data)
+
+            response_type = cart_view.get('response_type', 'html')
+            if response_type == 'json':
+                return self._parse_cart_json(resp.json(), cart_view.get('json_mapping', {}))
+            else:
+                return self._parse_cart_html(resp.text, cart_view.get('parsing', {}))
+        except Exception as e:
+            logger.error(f"[{self.site_id}] 장바구니 조회 에러: {e}")
+            return []
+
+    def _parse_cart_json(self, data, mapping: dict) -> list[CartItem]:
+        """JSON 장바구니 응답 파싱"""
+        items_path = mapping.get('items_path', '')
+        fields = mapping.get('fields', {})
+        items = data
+        for key in items_path.split('.'):
+            if key and isinstance(items, dict):
+                items = items.get(key, [])
+        if not isinstance(items, list):
+            return []
+
+        cart_items = []
+        for item in items:
+            cart_items.append(CartItem(
+                site_id=self.site_id,
+                product_code=str(item.get(fields.get('product_code', ''), '')),
+                product_name=str(item.get(fields.get('product_name', ''), '')),
+                quantity=int(item.get(fields.get('quantity', ''), 0) or 0),
+                unit_price=float(item.get(fields.get('unit_price', ''), 0) or 0),
+                total_price=float(item.get(fields.get('total_price', ''), 0) or 0),
+                raw_data=item,
+            ))
+        return cart_items
+
+    def _parse_cart_html(self, html: str, parsing_spec: dict) -> list[CartItem]:
+        """HTML 장바구니 응답 파싱"""
+        soup = BeautifulSoup(html, 'html.parser')
+        selector = parsing_spec.get('selector', 'tr')
+        fields = parsing_spec.get('fields', {})
+        rows = soup.select(selector)
+        cart_items = []
+
+        for row in rows:
+            name = self._extract_field(row, fields.get('product_name', ''))
+            if not name:
+                continue
+            cart_items.append(CartItem(
+                site_id=self.site_id,
+                product_code=self._extract_field(row, fields.get('product_code', '')),
+                product_name=name,
+                quantity=self._parse_int(self._extract_field(row, fields.get('quantity', ''))),
+                unit_price=self._parse_price(self._extract_field(row, fields.get('unit_price', ''))),
+                total_price=self._parse_price(self._extract_field(row, fields.get('total_price', ''))),
+            ))
+        return cart_items
+
+    def delete_from_cart(self, product_code: str) -> bool:
+        """장바구니에서 특정 상품 삭제"""
+        cart_delete = self._get_step('cart_delete')
+        if not cart_delete:
+            logger.warning(f"[{self.site_id}] cart_delete 레시피 없음")
+            return False
+
+        url = self._get_url(cart_delete)
+        method = cart_delete.get('method', 'POST')
+        payload = cart_delete.get('payload', {})
+        data = self._resolve_payload(payload, {
+            'PRODUCT_CODE': product_code, 'product_code': product_code
+        })
+
+        try:
+            resp = self._make_request(method=method, url=url,
+                                     content_type=cart_delete.get('content_type'), data=data)
+            return self._check_success(resp, cart_delete.get('success_indicator', {}))
+        except Exception as e:
+            logger.error(f"[{self.site_id}] 장바구니 삭제 에러: {e}")
+            return False
+
+    def clear_cart(self) -> bool:
+        """장바구니 전체 비우기"""
+        cart_clear = self._get_step('cart_clear')
+        if not cart_clear:
+            logger.warning(f"[{self.site_id}] cart_clear 레시피 없음")
+            return False
+
+        url = self._get_url(cart_clear)
+        method = cart_clear.get('method', 'GET')
+        payload = cart_clear.get('payload', {})
+        data = self._resolve_payload(payload, {}) if payload else None
+
+        try:
+            if method.upper() == 'GET':
+                full_url = self._build_url(url)
+                self._throttle()
+                resp = self.session.get(full_url, params=data, timeout=30)
+                resp.raise_for_status()
+            else:
+                resp = self._make_request(method=method, url=url,
+                                         content_type=cart_clear.get('content_type'), data=data)
+            return self._check_success(resp, cart_clear.get('success_indicator', {}))
+        except Exception as e:
+            logger.error(f"[{self.site_id}] 장바구니 비우기 에러: {e}")
+            return False
 
     # ─── 매출원장 ──────────────────────────────────────────
 
