@@ -3,10 +3,10 @@
   "site_name": "우정약품_auto",
   "site_url": "https://wjwp.co.kr",
   "encoding": "utf-8",
-  "recipe_version": "1.0",
+  "recipe_version": 5,
   "connection": {
-    "request_interval_ms": 500,
-    "ssl_verify": true
+    "base_url": "https://wjwp.co.kr",
+    "request_interval_ms": 300
   },
   "login": {
     "method": "POST",
@@ -19,15 +19,6 @@
     "success_indicator": {
       "type": "cookie",
       "key": "wjwp"
-    },
-    "cookie_extract": {
-      "cookie_name": "wjwp",
-      "fields": {
-        "VEN_CD": "venCd",
-        "MEM_CD": "memCd",
-        "MEM_ID": "memId",
-        "VEN_NM": "venNm"
-      }
     }
   },
   "search": {
@@ -36,12 +27,11 @@
     "params": {
       "tx_physic": "{KEYWORD}",
       "so": "0",
-      "so2": "0",
-      "df": "t"
+      "so2": "0"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "tr.ln_physic",
+      "selector": "#frmOrder .wrap_table tbody tr.ln_physic",
       "fields": {
         "product_code": {
           "selector": "input[name^=pc_]",
@@ -55,11 +45,7 @@
           "selector": "td:nth-child(2)",
           "attribute": "text"
         },
-        "edi_code": {
-          "selector": "td:nth-child(1)",
-          "attribute": "text"
-        },
-        "pack_unit": {
+        "specification": {
           "selector": "td:nth-child(4)",
           "attribute": "text"
         },
@@ -75,7 +61,7 @@
     },
     "pagination": {
       "type": "html_links",
-      "paging_selector": "div.paging a",
+      "paging_selector": ".paging a",
       "page_url_param": "Page",
       "max_pages": 5
     }
@@ -98,7 +84,7 @@
       "selector": "tr[id^=bagLine]",
       "fields": {
         "product_name": {
-          "selector": "a.bagPhysic_ln",
+          "selector": "td.td_nm a",
           "attribute": "text"
         },
         "product_code": {
@@ -111,10 +97,6 @@
         },
         "unit_price": {
           "selector": "input[name^=price_]",
-          "attribute": "value"
-        },
-        "total_price": {
-          "selector": "input[name^=totalPrice]",
           "attribute": "value"
         }
       }
@@ -146,38 +128,43 @@
       "eDate": "{END_DATE}",
       "tx_ven": "{VEN_CD}",
       "sv": "{VEN_CD}",
-      "transgu": "{DETAIL_MODE}"
+      "transgu": "{DETAIL_MODE}",
+      "sg": ""
+    },
+    "detail_values": {
+      "detail": "0",
+      "summary": "1"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "table.tbl_list:nth-of-type(2) tbody tr[align=right]",
+      "selector": "table.tbl_list:last-of-type tbody tr",
       "fields": {
-        "transaction_date": {
+        "date": {
           "selector": "td:nth-child(2)",
           "attribute": "text"
         },
         "manufacturer": {
-          "selector": "td.td_nm:nth-of-type(1)",
+          "selector": "td:nth-child(3)",
           "attribute": "text"
         },
         "product_name": {
-          "selector": "td.td_nm:nth-of-type(2)",
+          "selector": "td:nth-child(4)",
           "attribute": "text"
         },
-        "pack_unit": {
+        "specification": {
           "selector": "td:nth-child(5)",
           "attribute": "text"
         },
         "quantity": {
-          "selector": "td.td_num:nth-of-type(1)",
+          "selector": "td:nth-child(6)",
           "attribute": "text"
         },
         "unit_price": {
-          "selector": "td.td_num:nth-of-type(2)",
+          "selector": "td:nth-child(7)",
           "attribute": "text"
         },
         "sales_amount": {
-          "selector": "td.td_num:nth-of-type(3)",
+          "selector": "td:nth-child(8)",
           "attribute": "text"
         }
       }

@@ -5,7 +5,7 @@
 #   ./generate_and_validate.sh <site_url> <site_id> <username> <password> [site_name] [max_iterations]
 #
 # 예시:
-#   ./generate_and_validate.sh https://bpm.geoweb.kr bpm_geoweb_kr REDACTED_ID REDACTED_PW "지오웹BPM" 5
+#   ./generate_and_validate.sh https://example.com site_id username password "사이트명" 5
 
 set -e
 

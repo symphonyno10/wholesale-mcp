@@ -8,8 +8,8 @@
 사용법:
     python recipe_test_harness.py \\
         --recipe recipes/bpm_geoweb_kr.json \\
-        --username REDACTED_ID \\
-        --password REDACTED_PW
+        --username YOUR_ID \\
+        --password YOUR_PW
 """
 
 import json

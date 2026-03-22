@@ -5,7 +5,7 @@
 #   ./recipe_generator.sh <site_url> <site_id> <username> <password> [site_name]
 #
 # 예시:
-#   ./recipe_generator.sh https://bpm.geoweb.kr bpm_geoweb_kr REDACTED_ID REDACTED_PW "지오웹BPM"
+#   ./recipe_generator.sh https://example.com site_id username password "사이트명"
 
 set -e
 

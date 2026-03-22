@@ -121,7 +121,7 @@ def main():
     executor = SiteExecutor(recipe)
 
     print("\n로그인 중...")
-    if not executor.login("REDACTED_ID", "1234"):
+    if not executor.login(os.environ.get("USERNAME", ""), os.environ.get("PASSWORD", "")):
         print("❌ 로그인 실패")
         return
 

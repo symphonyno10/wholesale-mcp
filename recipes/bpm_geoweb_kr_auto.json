@@ -1,20 +1,25 @@
 {
+  "recipe_version": 4,
   "site_id": "bpm_geoweb_kr_auto",
   "site_name": "지오웹BPM_auto",
   "site_url": "https://bpm.geoweb.kr",
   "encoding": "utf-8",
-  "recipe_version": "1.0",
+  "analyzed_by": "mcp-auto-generator",
+  "analyzed_at": "2026-03-22",
   "connection": {
+    "pre_login_get": true,
     "request_interval_ms": 500,
     "ssl_verify": true
   },
+  "verified": false,
   "login": {
     "method": "POST",
-    "url": "/Member/Login",
+    "url": "https://bpm.geoweb.kr/Member/Login",
     "payload": {
-      "LoginID": "{username}",
-      "Password": "{password}"
+      "LoginID": "{USERNAME}",
+      "Password": "{PASSWORD}"
     },
+    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "cookie",
       "key": "GEORELAUTH"
@@ -22,48 +27,53 @@
   },
   "search": {
     "method": "POST",
-    "url": "/Home/PartialSearchProduct",
+    "url": "https://bpm.geoweb.kr/Home/PartialSearchProduct",
     "params": {
       "srchCate": "",
       "prdtType": "",
       "prdOrder": "3",
-      "srchText": "{keyword}",
+      "srchText": "{KEYWORD}",
       "srchCompany": "",
       "startdate": "",
       "enddate": ""
     },
+    "content_type": "application/x-www-form-urlencoded",
     "response_type": "html",
     "parsing": {
       "selector": "tr.tr-product-list",
       "fields": {
-        "product_code": {
-          "selector": ".div-product-detail ul li:first-child",
+        "product_name": {
+          "selector": "td.proName",
           "attribute": "text"
         },
-        "product_name": "td.proName",
-        "manufacturer": "td.phaCompany span",
-        "pack_unit": "td.standard",
-        "stock_quantity": "td.stock span"
+        "product_code": {
+          "selector": ".div-product-detail li:nth-child(1)",
+          "attribute": "text"
+        },
+        "manufacturer": {
+          "selector": "td.phaCompany span",
+          "attribute": "text"
+        },
+        "standard": {
+          "selector": "td.standard",
+          "attribute": "text"
+        },
+        "stock_quantity": {
+          "selector": "td.stock span",
+          "attribute": "text"
+        }
       }
-    },
-    "product_detail": {
-      "method": "POST",
-      "url": "/Home/PartialProductInfo/{product_code}",
-      "payload": {
-        "num": "{stock_quantity}"
-      },
-      "response_type": "html",
-      "price_selector": "th:contains('주문단가') + td"
     }
   },
   "cart_add": {
     "method": "POST",
-    "url": "/Home/DataCart/add",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/add",
     "payload": {
-      "productCode": "{product_code}",
+      "productCode": "{PRODUCT_CODE}",
       "moveCode": "",
-      "orderQty": "{quantity}"
+      "orderQty": "{QUANTITY}"
     },
+    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "result",
@@ -72,33 +82,39 @@
   },
   "cart_view": {
     "method": "POST",
-    "url": "/Home/PartialProductCart",
+    "url": "https://bpm.geoweb.kr/Home/PartialProductCart",
     "response_type": "html",
     "parsing": {
       "selector": "tr.tr_cart_list",
       "fields": {
-        "product_code": {
-          "selector": ".div_cart_detail ul li:first-child",
+        "product_name": {
+          "selector": "td.phaCompany",
           "attribute": "text"
         },
-        "product_name": "td.phaCompany",
+        "product_code": {
+          "selector": ".div_cart_detail li:nth-child(1)",
+          "attribute": "text"
+        },
         "quantity": {
           "selector": "td.quantity input",
           "attribute": "value"
         },
-        "unit_price": "td.unitPrice",
-        "total_price": "td.amountMoney"
+        "unit_price": {
+          "selector": "td.unitPrice",
+          "attribute": "text"
+        }
       }
     }
   },
   "cart_delete": {
     "method": "POST",
-    "url": "/Home/DataCart/del",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/del",
     "payload": {
-      "productCode": "{product_code}",
+      "productCode": "{PRODUCT_CODE}",
       "moveCode": "",
       "orderQty": "0"
     },
+    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "result",
@@ -107,12 +123,13 @@
   },
   "cart_clear": {
     "method": "POST",
-    "url": "/Home/DataCart/alldel",
+    "url": "https://bpm.geoweb.kr/Home/DataCart/alldel",
     "payload": {
       "productCode": "",
       "moveCode": "",
       "orderQty": "0"
     },
+    "content_type": "application/x-www-form-urlencoded",
     "success_indicator": {
       "type": "json_field",
       "path": "result",
@@ -121,34 +138,67 @@
   },
   "sales_ledger": {
     "method": "GET",
-    "url": "/MyPage/SalesLedger",
-    "date_format": "%Y-%m-%d",
+    "url": "https://bpm.geoweb.kr/MyPage/SalesLedger",
     "params": {
-      "dtpFrom": "{start_date}",
-      "dtpTo": "{end_date}",
-      "printFlag": "2",
+      "dtpFrom": "{START_DATE}",
+      "dtpTo": "{END_DATE}",
+      "printFlag": "{DETAIL_MODE}",
       "srchFlag": ""
+    },
+    "detail_values": {
+      "detail": "2",
+      "summary": "1"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "table tbody tr",
+      "selector": "section table tbody tr:has(td.date)",
       "fields": {
-        "transaction_date": "td.date",
-        "product_name": "td.proName",
-        "sales_amount": "td.salAmountMoney",
-        "payment": "td.dipAmountMoney",
-        "balance": "td.balance"
+        "transaction_date": {
+          "selector": "td.date",
+          "attribute": "text"
+        },
+        "division": {
+          "selector": "td.divide",
+          "attribute": "text"
+        },
+        "product_name": {
+          "selector": "td.proName",
+          "attribute": "text"
+        },
+        "insurance_code": {
+          "selector": "td.code",
+          "attribute": "text"
+        },
+        "quantity": {
+          "selector": "td.quantity",
+          "attribute": "text"
+        },
+        "unit_price": {
+          "selector": "td.salUnitPrice",
+          "attribute": "text"
+        },
+        "sales_amount": {
+          "selector": "td.salAmountMoney",
+          "attribute": "text"
+        },
+        "payment": {
+          "selector": "td.dipAmountMoney",
+          "attribute": "text"
+        },
+        "balance": {
+          "selector": "td.balance",
+          "attribute": "text"
+        }
       }
     }
   },
   "available_features": {
-    "login": true,
     "search": true,
     "cart_add": true,
     "cart_view": true,
     "cart_delete": true,
     "cart_clear": true,
     "sales_ledger": true,
-    "pagination": false
+    "order_submit": false
   }
 }
