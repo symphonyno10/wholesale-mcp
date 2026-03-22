@@ -239,6 +239,23 @@ class SiteExecutor:
                 except Exception as e:
                     logger.warning(f"[{self.site_id}] JWT 토큰 추출 실패: {e}")
 
+            # 쿠키에서 사용자 변수 추출 (cookie_parse)
+            cookie_parse = login_spec.get('cookie_parse')
+            if cookie_parse and success:
+                try:
+                    from urllib.parse import parse_qs, unquote
+                    cookie_name = cookie_parse.get('cookie_name', '')
+                    cookie_val = self.session.cookies.get(cookie_name, '')
+                    if cookie_val and cookie_parse.get('format') == 'querystring':
+                        parsed = parse_qs(unquote(cookie_val), keep_blank_values=True)
+                        for var_name, cookie_key in cookie_parse.get('fields', {}).items():
+                            vals = parsed.get(cookie_key, [])
+                            if vals:
+                                self._login_data[var_name] = vals[0]
+                        logger.info(f"[{self.site_id}] 쿠키 변수 추출: {list(cookie_parse.get('fields', {}).keys())}")
+                except Exception as e:
+                    logger.warning(f"[{self.site_id}] 쿠키 파싱 실패: {e}")
+
             self._authenticated = success
             if success:
                 logger.info(f"[{self.site_id}] 로그인 성공")
@@ -1022,10 +1039,12 @@ class SiteExecutor:
         last_date = ''
 
         for row_html in rows:
-            # 제품명 추출 (td.td_nm)
-            nm_match = td_nm_pattern.search(row_html)
-            if not nm_match:
+            # 제품명 추출 (td.td_nm) — 여러 개일 수 있음 (제조사, 제품명)
+            nm_matches = list(td_nm_pattern.finditer(row_html))
+            if not nm_matches:
                 continue
+            # td_nm이 2개 이상이면 마지막을 제품명으로 사용 (첫 번째는 제조사)
+            nm_match = nm_matches[-1]
             product_name = re.sub(r'<[^>]+>', '', nm_match.group(1)).strip()
             product_name = product_name.replace('&nbsp;', '').strip()
             if not product_name or '거래명세서' in product_name or product_name.startswith('['):
@@ -1056,7 +1075,7 @@ class SiteExecutor:
             nums_clean = [re.sub(r'<[^>]+>', '', n).strip().replace(',', '') for n in nums]
             # 빈 문자열 제거하지 않음 (위치 중요)
 
-            # 규격 (td_nm 다음 td)
+            # 규격 (마지막 td_nm 다음 td)
             pack_unit = ''
             nm_end = nm_match.end()
             after_nm = row_html[nm_end:]

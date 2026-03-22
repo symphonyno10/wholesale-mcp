@@ -1,0 +1,154 @@
+{
+  "site_id": "bpm_geoweb_kr_auto",
+  "site_name": "지오웹BPM_auto",
+  "site_url": "https://bpm.geoweb.kr",
+  "encoding": "utf-8",
+  "recipe_version": "1.0",
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "/Member/Login",
+    "payload": {
+      "LoginID": "{username}",
+      "Password": "{password}"
+    },
+    "success_indicator": {
+      "type": "cookie",
+      "key": "GEORELAUTH"
+    }
+  },
+  "search": {
+    "method": "POST",
+    "url": "/Home/PartialSearchProduct",
+    "params": {
+      "srchCate": "",
+      "prdtType": "",
+      "prdOrder": "3",
+      "srchText": "{keyword}",
+      "srchCompany": "",
+      "startdate": "",
+      "enddate": ""
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "tr.tr-product-list",
+      "fields": {
+        "product_code": {
+          "selector": ".div-product-detail ul li:first-child",
+          "attribute": "text"
+        },
+        "product_name": "td.proName",
+        "manufacturer": "td.phaCompany span",
+        "pack_unit": "td.standard",
+        "stock_quantity": "td.stock span"
+      }
+    },
+    "product_detail": {
+      "method": "POST",
+      "url": "/Home/PartialProductInfo/{product_code}",
+      "payload": {
+        "num": "{stock_quantity}"
+      },
+      "response_type": "html",
+      "price_selector": "th:contains('주문단가') + td"
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "/Home/DataCart/add",
+    "payload": {
+      "productCode": "{product_code}",
+      "moveCode": "",
+      "orderQty": "{quantity}"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
+  "cart_view": {
+    "method": "POST",
+    "url": "/Home/PartialProductCart",
+    "response_type": "html",
+    "parsing": {
+      "selector": "tr.tr_cart_list",
+      "fields": {
+        "product_code": {
+          "selector": ".div_cart_detail ul li:first-child",
+          "attribute": "text"
+        },
+        "product_name": "td.phaCompany",
+        "quantity": {
+          "selector": "td.quantity input",
+          "attribute": "value"
+        },
+        "unit_price": "td.unitPrice",
+        "total_price": "td.amountMoney"
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "POST",
+    "url": "/Home/DataCart/del",
+    "payload": {
+      "productCode": "{product_code}",
+      "moveCode": "",
+      "orderQty": "0"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
+  "cart_clear": {
+    "method": "POST",
+    "url": "/Home/DataCart/alldel",
+    "payload": {
+      "productCode": "",
+      "moveCode": "",
+      "orderQty": "0"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "result",
+      "value": "1"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "/MyPage/SalesLedger",
+    "date_format": "%Y-%m-%d",
+    "params": {
+      "dtpFrom": "{start_date}",
+      "dtpTo": "{end_date}",
+      "printFlag": "2",
+      "srchFlag": ""
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "table tbody tr",
+      "fields": {
+        "transaction_date": "td.date",
+        "product_name": "td.proName",
+        "sales_amount": "td.salAmountMoney",
+        "payment": "td.dipAmountMoney",
+        "balance": "td.balance"
+      }
+    }
+  },
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": true,
+    "sales_ledger": true,
+    "pagination": false
+  }
+}

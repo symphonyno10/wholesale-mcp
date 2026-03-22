@@ -1,0 +1,193 @@
+{
+  "site_id": "wos_nicepharm_com_auto",
+  "site_name": "복산나이스팜_auto",
+  "site_url": "https://wos.nicepharm.com",
+  "encoding": "utf-8",
+  "recipe_version": "1.0",
+  "connection": {
+    "request_interval_ms": 500
+  },
+  "login": {
+    "method": "POST",
+    "url": "https://wos.nicepharm.com/Common/Certify/Login.asp",
+    "payload": {
+      "tx_id": "{USERNAME}",
+      "tx_pw": "{PASSWORD}"
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "success_indicator": {
+      "type": "cookie",
+      "key": "wos"
+    },
+    "cookie_parse": {
+      "cookie_name": "wos",
+      "format": "querystring",
+      "fields": {
+        "VEN_CD": "venCd",
+        "VEN_NM": "venNm",
+        "STOCK_CD": "stockCd",
+        "MEM_KIND": "memKind"
+      }
+    }
+  },
+  "search": {
+    "method": "POST",
+    "url": "https://wos.nicepharm.com/Service/Order/Order.asp",
+    "params": {
+      "tx_physic": "{KEYWORD}",
+      "tx_maker": "",
+      "so": "0",
+      "so2": "0",
+      "tx_ven": "{VEN_CD}",
+      "currVenNm": "{VEN_NM}",
+      "currMkind": "U",
+      "sv": "{VEN_CD}",
+      "currStockCd": "{STOCK_CD}",
+      "currSndStockCd": "",
+      "UserDef001": "02",
+      "saveNumOrders": ""
+    },
+    "content_type": "application/x-www-form-urlencoded",
+    "response_type": "html",
+    "parsing": {
+      "selector": "tr.ln_physic",
+      "fields": {
+        "product_name": {
+          "selector": "td:nth-child(3) a",
+          "attribute": "text"
+        },
+        "product_code": {
+          "selector": "input[name^=pc_]",
+          "attribute": "value"
+        },
+        "manufacturer": {
+          "selector": "td:nth-child(2)",
+          "attribute": "text"
+        },
+        "specification": {
+          "selector": "td:nth-child(4)",
+          "attribute": "text"
+        },
+        "unit_price": {
+          "selector": "input[name^=price_]",
+          "attribute": "value"
+        },
+        "stock_quantity": {
+          "selector": "input[name^=stock_]",
+          "attribute": "value"
+        }
+      }
+    },
+    "pagination": {
+      "type": "html_links",
+      "paging_selector": "div.paging a",
+      "page_url_param": "Page",
+      "method_override": "GET",
+      "max_pages": 5
+    }
+  },
+  "cart_add": {
+    "type": "form",
+    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "form_name": "frmOrder",
+    "product_code_prefix": "pc_",
+    "quantity_prefix": "qty_"
+  },
+  "cart_view": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/Order/Bag.asp",
+    "params": {
+      "currVenCd": "{VEN_CD}",
+      "currMkind": "U",
+      "currStockCd": "{STOCK_CD}"
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "tr[id^=bagLine]",
+      "fields": {
+        "product_name": {
+          "selector": "td.td_nm a",
+          "attribute": "text"
+        },
+        "product_code": {
+          "selector": "input[name^=pc_]",
+          "attribute": "value"
+        },
+        "quantity": {
+          "selector": "input[name^=bagQty_]",
+          "attribute": "value"
+        },
+        "unit_price": {
+          "selector": "input[name^=price_]",
+          "attribute": "value"
+        },
+        "bag_num": {
+          "selector": "input[name^=bag_num_]",
+          "attribute": "value"
+        }
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "params": {
+      "kind": "multiupdbag",
+      "actflag": "DEL",
+      "currVenCd": "{VEN_CD}",
+      "currMkind": "U",
+      "orderNum": "{BAG_NUM}|{PRODUCT_CODE}|{STOCK_CD}|{QUANTITY}"
+    },
+    "requires_cart_view": true
+  },
+  "cart_clear": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/Order/BagOrder.asp",
+    "params": {
+      "kind": "del",
+      "currVenCd": "{VEN_CD}",
+      "currMkind": "U"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "https://wos.nicepharm.com/Service/SalesLedger/SalesLedger.asp",
+    "params": {
+      "sDate": "{START_DATE}",
+      "eDate": "{END_DATE}",
+      "tx_ven": "{VEN_CD}",
+      "sv": "{VEN_CD}",
+      "currVenNm": "{VEN_NM}",
+      "transgu": "1",
+      "tx_physic": "{PRODUCT_FILTER}"
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "table.tbl_list tbody tr",
+      "skip_rows": 1,
+      "fields": {
+        "date": {
+          "selector": "td:nth-child(2)",
+          "attribute": "text"
+        },
+        "product_name": {
+          "selector": "td.td_nm",
+          "attribute": "text"
+        },
+        "sales_amount": {
+          "selector": "td.td_num",
+          "attribute": "text"
+        }
+      }
+    },
+    "date_format": "%Y-%m-%d"
+  },
+  "available_features": {
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": true,
+    "sales_ledger": true
+  }
+}

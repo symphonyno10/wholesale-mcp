@@ -1,0 +1,165 @@
+{
+  "site_id": "ibjp_co_kr_auto",
+  "site_name": "백제약품_auto",
+  "site_url": "https://www.ibjp.co.kr",
+  "encoding": "utf-8",
+  "recipe_version": "1.0",
+  "connection": {
+    "ssl_verify": true,
+    "request_interval_ms": 500
+  },
+  "login": {
+    "method": "POST",
+    "url": "/jwt/login",
+    "content_type": "application/json",
+    "payload": {
+      "loginId": "{USERNAME}",
+      "pwd": "{PASSWORD}",
+      "companyYn": "N"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "accessToken",
+      "value": ""
+    },
+    "token": {
+      "path": "accessToken",
+      "header": "Authorization",
+      "prefix": "Bearer ",
+      "user_data_path": "userData"
+    }
+  },
+  "search": {
+    "method": "GET",
+    "url": "/ord/itemSearch",
+    "params": {
+      "keyword": "{KEYWORD}",
+      "makerNm": "",
+      "history": "N",
+      "excludingOutOfOtock": "N",
+      "custCd": "{CUST_CD}",
+      "custGbCd": "{CUST_GB_CD}",
+      "ordMakerCd": "{ORD_MAKER_CD}",
+      "userGbCd": "{USER_GB_CD}",
+      "ing": "N",
+      "eff": "N",
+      "ingno": "AAAAAAAAAAAAAA",
+      "effno": "AAAAAAAAAAAA",
+      "searchAll": "Y",
+      "professionalYn": "N",
+      "generalYn": "N",
+      "paymentYn": "N",
+      "nonPaymentYn": "N",
+      "searchOption": "0"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM_UNIT",
+        "edi_code": "BOHUM_CD",
+        "manufacturer": "MAKER_NM",
+        "unit_price": "ORD_WP2_AMT",
+        "stock_quantity": "AVAIL_STOCK",
+        "pack_unit": "UNIT",
+        "insurance_type": "PAY_ITEM_NM",
+        "box_quantity": "LARGEBOX_QTY"
+      }
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "/ord/addBasket",
+    "content_type": "application/json",
+    "payload": {
+      "basketGbCd": "01",
+      "saveItemCd": "{PRODUCT_CODE}",
+      "saveItemGbCd": "01",
+      "dlvBrchCd": "{DLV_BRCH_CD}",
+      "saveItemQty": "{QUANTITY}",
+      "userId": "{USER_ID}",
+      "custCd": "{CUST_CD}"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상적으로 처리되었습니다"
+    }
+  },
+  "cart_view": {
+    "method": "GET",
+    "url": "/ord/basketList",
+    "params": {
+      "userGbCd": "{USER_GB_CD}",
+      "custCd": "{CUST_CD}",
+      "basketGbCd": "01",
+      "gDlvBrchFlag": ""
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM",
+        "quantity": "ITEM_QTY",
+        "unit_price": "ORD_WP2_AMT"
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "DELETE",
+    "url": "/ord/deleteComOrdBasket",
+    "params": {
+      "userId": "{USER_ID}",
+      "custCd": "{CUST_CD}",
+      "itemQty": "",
+      "ordWp2Amt": "",
+      "basketGbCd": "01",
+      "saveItemGbCd": "01",
+      "saveItemCd": "{PRODUCT_CODE}",
+      "dlvBrchCd": "{DLV_BRCH_CD}"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상적으로 처리되었습니다"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "/ordLedger/listSearch",
+    "date_format": "%Y%m%d",
+    "params": {
+      "custCd": "{CUST_CD}",
+      "custNm": "{CUST_NM}",
+      "orderVal": "0",
+      "startDt": "{START_DATE}",
+      "endDt": "{END_DATE}",
+      "searchAll": "Y",
+      "salesYn": "N",
+      "returnYn": "N",
+      "paymentYn": "N",
+      "compensationYn": "N",
+      "sortType": "Web"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "transaction_date": "APRV_DT",
+        "product_name": "ITEM_NM_UNIT",
+        "quantity": "ITEM_CNT_TXT",
+        "sales_amount": "TOTAL_AMT",
+        "payment": "PAY_AMT",
+        "balance": "BALANCE_A_AMT"
+      }
+    }
+  },
+  "available_features": {
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": false,
+    "sales_ledger": true
+  }
+}
