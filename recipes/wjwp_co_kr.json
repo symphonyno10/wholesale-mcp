@@ -3,7 +3,7 @@
   "site_name": "우정약품",
   "site_url": "https://wjwp.co.kr",
   "encoding": "utf-8",
-  "recipe_version": "1.0",
+  "recipe_version": 4,
   "connection": {
     "request_interval_ms": 500,
     "ssl_verify": true

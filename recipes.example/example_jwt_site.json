@@ -61,7 +61,39 @@
     "content_type": "application/json",
     "success_indicator": {
       "type": "contains",
-      "value": "정상적으로 처리"
+      "value": "정상"
+    }
+  },
+  "cart_view": {
+    "method": "GET",
+    "url": "https://example-spa.com/ord/basketList",
+    "params": {
+      "custCd": "{CUST_CD}",
+      "basketGbCd": "01"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM",
+        "quantity": "ITEM_QTY",
+        "unit_price": "ORD_WP2_AMT"
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "DELETE",
+    "url": "https://example-spa.com/ord/deleteBasket",
+    "payload": {
+      "custCd": "{CUST_CD}",
+      "itemCd": "{PRODUCT_CODE}",
+      "basketGbCd": "01"
+    },
+    "content_type": "application/json",
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상"
     }
   },
   "sales_ledger": {
@@ -82,6 +114,31 @@
         "sales_amount": "TOTAL_AMT",
         "balance": "BALANCE_A_AMT"
       }
+    },
+    "sales_ledger_detail": {
+      "method": "GET",
+      "url": "https://example-spa.com/ordLedger/detailSearch",
+      "params": {"sn": "{SN}"},
+      "response_type": "json",
+      "json_mapping": {
+        "items_path": "custList",
+        "fields": {
+          "product_name": "ITEM_NM_UNIT",
+          "quantity": "ITEM_QTY",
+          "unit_price": "ORD_WP2_AMT",
+          "sales_amount": "TOTAL_AMT"
+        }
+      }
     }
+  },
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": false,
+    "sales_ledger": true,
+    "pagination": false
   }
 }
