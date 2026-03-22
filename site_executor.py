@@ -912,10 +912,17 @@ class SiteExecutor:
             except ValueError:
                 pass
 
+        # detail_values 매핑: 사이트마다 상세/요약 값이 다름
+        detail_values = ledger_spec.get('detail_values', {})
+        if detail_values:
+            resolved_mode = detail_values.get('detail', '0') if detail_mode == '0' else detail_values.get('summary', '1')
+        else:
+            resolved_mode = detail_mode
+
         variables = {
             'START_DATE': s_date, 'start_date': s_date,
             'END_DATE': e_date, 'end_date': e_date,
-            'DETAIL_MODE': detail_mode, 'detail_mode': detail_mode,
+            'DETAIL_MODE': resolved_mode, 'detail_mode': resolved_mode,
             'PRODUCT_FILTER': product_filter, 'product_filter': product_filter,
             'PRODUCT_NAME_FILTER': product_filter,
         }

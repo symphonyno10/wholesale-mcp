@@ -1,5 +1,8 @@
 # Python
 venv/
+
+# 서브에이전트 로그
+logs/
 __pycache__/
 *.pyc
 *.pyo
