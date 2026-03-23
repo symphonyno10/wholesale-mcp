@@ -1020,7 +1020,7 @@ class SiteExecutor:
                 for field_name, field_spec in fields.items():
                     raw[field_name] = self._extract_field(item, field_spec)
                 name = (raw.get('product_name') or '').strip()
-                if not name or name.startswith('['):
+                if not name or name.startswith('[') or '거래명세서' in name or '월계' in name or '누계' in name:
                     continue
                 entries.append(SalesLedgerEntry(
                     site_id=self.site_id,
@@ -1109,6 +1109,40 @@ class SiteExecutor:
 
     # ─── 장바구니 / 주문 ──────────────────────────────────
 
+    def _do_price_lookup(self, product_code: str, lookup_spec: dict) -> str:
+        """cart_add 전에 단가를 조회하는 pre-request.
+
+        레시피의 cart_add.price_lookup 스펙에 따라 단가를 조회하여 문자열로 반환.
+        실패 시 "0" 반환.
+        """
+        lookup_url = self._get_url(lookup_spec)
+        if not lookup_url:
+            return "0"
+        params_spec = lookup_spec.get('params', {})
+        variables = {'PRODUCT_CODE': product_code, 'product_code': product_code}
+        params = self._resolve_payload(params_spec, variables) if params_spec else {}
+        try:
+            method = lookup_spec.get('method', 'GET')
+            if method.upper() == 'GET':
+                full_url = self._build_url(lookup_url)
+                self._throttle()
+                resp = self.session.get(full_url, params=params, timeout=30)
+                resp.raise_for_status()
+            else:
+                resp = self._make_request(method=method, url=lookup_url, data=params, timeout=30)
+            price_path = lookup_spec.get('price_path', '')
+            if price_path and resp.headers.get('content-type', '').startswith(('application/json', 'text/html')):
+                data = resp.json()
+                for key in price_path.split('.'):
+                    if key.isdigit():
+                        data = data[int(key)] if isinstance(data, list) and len(data) > int(key) else data
+                    elif isinstance(data, dict):
+                        data = data.get(key, data)
+                return str(data)
+        except Exception as e:
+            logger.warning(f"[{self.site_id}] price_lookup 실패: {e}")
+        return "0"
+
     def add_to_cart(self, product_code: str, quantity: int) -> bool:
         cart_spec = self._get_step('cart_add')
         if not cart_spec:
@@ -1130,10 +1164,17 @@ class SiteExecutor:
         payload = cart_spec.get('payload', {})
         params = cart_spec.get('params', {})
 
+        # price_lookup: 장바구니 추가 전 단가 조회
+        unit_price = "0"
+        price_lookup = cart_spec.get('price_lookup')
+        if price_lookup:
+            unit_price = self._do_price_lookup(product_code, price_lookup)
+
         if payload:
             variables = {
                 'PRODUCT_CODE': product_code, 'product_code': product_code,
                 'QUANTITY': str(quantity), 'quantity': str(quantity),
+                'UNIT_PRICE': unit_price, 'unit_price': unit_price,
             }
             data = self._resolve_payload(payload, variables)
         else:
