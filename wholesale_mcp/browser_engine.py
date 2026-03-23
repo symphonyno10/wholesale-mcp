@@ -382,3 +382,295 @@ class BrowserEngine:
         if not frame:
             return {"error": "iframe content_frame 접근 불가"}
         return await frame.evaluate(SNAPSHOT_JS)
+
+    # ═══════════════════════════════════════════
+    # 3계층 API 추출 시스템
+    # ═══════════════════════════════════════════
+
+    async def detect_framework(self) -> dict:
+        """프레임워크 자동 감지"""
+        page = await self.ensure_browser()
+        return await page.evaluate("""() => {
+            const d = {};
+            if (window.jQuery) d.jquery = jQuery.fn.jquery;
+            if (window.$?.fn?.jquery && !d.jquery) d.jquery = $.fn.jquery;
+            if (window.angular) d.angularjs = angular.version?.full || '1.x';
+            try { if (document.querySelector('#q-app')?.__vue_app__) d.vue3 = document.querySelector('#q-app').__vue_app__.version || true; } catch(e) {}
+            try { if (document.querySelector('[data-v-]')) d.vue2 = true; } catch(e) {}
+            try { if (document.querySelector('[data-reactroot]') || document.querySelector('#root')?._reactRootContainer) d.react = true; } catch(e) {}
+            return d;
+        }""")
+
+    async def extract_button_actions(self) -> dict:
+        """3계층 API 추출: 정적 → 프레임워크별 → 동적 캡처"""
+        fw = await self.detect_framework()
+        actions = []
+        layers_used = []
+
+        # Layer 1: 정적 추출 (항상)
+        static = await self._extract_static()
+        if static:
+            actions += static
+            layers_used.append("static")
+
+        # Layer 2: 프레임워크별 심층 추출
+        if 'jquery' in fw:
+            jquery_actions = await self._extract_jquery()
+            if jquery_actions:
+                actions += jquery_actions
+                layers_used.append("jquery")
+
+        if 'angularjs' in fw:
+            angular_actions = await self._extract_angularjs()
+            if angular_actions:
+                actions += angular_actions
+                layers_used.append("angularjs")
+
+        # Layer 3: SPA 동적 캡처 (Vue 3/React 또는 Layer 1+2 결과 부족 시)
+        api_actions = [a for a in actions if a.get('api') or a.get('ajax_urls')]
+        if 'vue3' in fw or 'react' in fw or not api_actions:
+            dynamic = await self._extract_dynamic_capture()
+            if dynamic:
+                actions += dynamic
+                layers_used.append("dynamic_capture")
+
+        return {
+            "framework": fw,
+            "button_actions": actions,
+            "extraction_layers_used": layers_used
+        }
+
+    async def _extract_static(self) -> list:
+        """Layer 1: href, action, onclick 등 HTML 속성에서 정적 추출"""
+        page = await self.ensure_browser()
+        return await page.evaluate("""() => {
+            const results = [];
+
+            // 모든 인터랙티브 요소
+            document.querySelectorAll('button, a, input[type=submit], input[type=image], [onclick], [ng-click], [data-ng-click]').forEach(el => {
+                const text = (el.textContent || '').trim() || el.alt || el.title || '';
+                if (!text || text.length > 40) return;
+
+                const action = {text: text.substring(0, 30), type: 'static'};
+
+                // href
+                const href = el.getAttribute('href');
+                if (href && href !== '#' && !href.startsWith('javascript:void') && !href.startsWith('javascript:;')) {
+                    action.href = href;
+                    action.type = 'href';
+                }
+
+                // onclick 계열
+                const onclick = el.getAttribute('onclick') || el.getAttribute('ng-click') || el.getAttribute('data-ng-click') || el.getAttribute('@click') || el.getAttribute('v-on:click');
+                if (onclick) {
+                    action.onclick = onclick.substring(0, 100);
+                    const funcMatch = onclick.match(/(\\w+)\\s*\\(/);
+                    if (funcMatch) action.handler_name = funcMatch[1];
+                }
+
+                // form submit
+                const form = el.closest('form');
+                if (form && (el.type === 'submit' || el.type === 'image')) {
+                    action.type = 'form_submit';
+                    action.form = form.name || form.id || '';
+                    action.action = form.action || '';
+                    action.method = (form.method || 'GET').toUpperCase();
+                }
+
+                if (action.href || action.onclick || action.type === 'form_submit') {
+                    results.push(action);
+                }
+            });
+
+            // iframe 안 링크도 정적 추출
+            document.querySelectorAll('iframe').forEach(iframe => {
+                try {
+                    const doc = iframe.contentDocument;
+                    if (!doc) return;
+                    doc.querySelectorAll('a[href*=".asp"], a[href*="/Home/"]').forEach(a => {
+                        const text = (a.textContent || '').trim() || a.id || '';
+                        if (text) {
+                            results.push({
+                                text: text.substring(0, 30),
+                                type: 'href',
+                                href: a.getAttribute('href'),
+                                in_iframe: iframe.id || iframe.name || 'unnamed'
+                            });
+                        }
+                    });
+                } catch(e) {} // cross-origin
+            });
+
+            return results;
+        }""")
+
+    async def _extract_jquery(self) -> list:
+        """Layer 2A: jQuery $._data()로 이벤트 핸들러 + API URL 추출"""
+        page = await self.ensure_browser()
+        return await page.evaluate("""() => {
+            if (!window.jQuery && !window.$) return [];
+            const $ = window.jQuery || window.$;
+            const results = [];
+
+            const URL_PATTERN = /["']([^"']*(?:\\.asp|\\.php|\\/Home\\/|\\/api\\/|\\/Service\\/|\\/ord\\/|\\/common\\/ajax\\/|\\/jwt\\/)[^"']*)/g;
+
+            function extractFromElement(el, iframeName) {
+                const events = $._data ? $._data(el, 'events') : null;
+                if (!events) return;
+                const text = (el.textContent || '').trim() || el.alt || el.id || '';
+                if (!text) return;
+
+                for (const [type, handlers] of Object.entries(events)) {
+                    if (type !== 'click' && type !== 'submit') continue;
+                    handlers.forEach(h => {
+                        const src = h.handler.toString();
+                        const varUrl = src.match(/var\\s+url\\s*=\\s*["']([^"']+)/);
+                        const urls = [];
+                        let m;
+                        const pat = new RegExp(URL_PATTERN.source, 'g');
+                        while ((m = pat.exec(src)) !== null) urls.push(m[1]);
+
+                        const action = {
+                            text: text.substring(0, 30),
+                            type: 'jquery_click',
+                            event: type
+                        };
+                        if (varUrl) action.api = varUrl[1];
+                        else if (urls.length) action.ajax_urls = [...new Set(urls)];
+                        if (iframeName) action.in_iframe = iframeName;
+
+                        if (action.api || action.ajax_urls) results.push(action);
+                    });
+                }
+            }
+
+            // 메인 페이지
+            document.querySelectorAll('button, a[id], input[type=image], input[type=submit], [class*=btn]').forEach(el => {
+                extractFromElement(el, null);
+            });
+
+            // iframe 내부
+            document.querySelectorAll('iframe').forEach(iframe => {
+                try {
+                    const iframeJQ = iframe.contentWindow?.jQuery || iframe.contentWindow?.$;
+                    if (!iframeJQ || !iframeJQ._data) return;
+                    const doc = iframe.contentDocument;
+                    doc.querySelectorAll('a[id], button, input[type=image]').forEach(el => {
+                        const events = iframeJQ._data(el, 'events');
+                        if (!events) return;
+                        const text = (el.textContent || '').trim() || el.alt || el.id || '';
+                        for (const [type, handlers] of Object.entries(events)) {
+                            if (type !== 'click' && type !== 'submit') continue;
+                            handlers.forEach(h => {
+                                const src = h.handler.toString();
+                                const varUrl = src.match(/var\\s+url\\s*=\\s*["']([^"']+)/);
+                                const urls = [];
+                                let m;
+                                const pat = new RegExp(URL_PATTERN.source, 'g');
+                                while ((m = pat.exec(src)) !== null) urls.push(m[1]);
+                                const action = {
+                                    text: text.substring(0, 30),
+                                    type: 'jquery_click',
+                                    event: type,
+                                    in_iframe: iframe.id || iframe.name
+                                };
+                                if (varUrl) action.api = varUrl[1];
+                                else if (urls.length) action.ajax_urls = [...new Set(urls)];
+                                if (action.api || action.ajax_urls) results.push(action);
+                            });
+                        }
+                    });
+                } catch(e) {} // cross-origin
+            });
+
+            return results;
+        }""")
+
+    async def _extract_angularjs(self) -> list:
+        """Layer 2B: AngularJS ng-click → scope 함수 → URL 추출"""
+        page = await self.ensure_browser()
+        return await page.evaluate("""() => {
+            if (!window.angular) return [];
+            const results = [];
+            const URL_PATTERN = /["']([^"']*(?:\\.asp|\\.php|\\/Home\\/|\\/api\\/|\\/common\\/ajax\\/)[^"']*)/g;
+
+            document.querySelectorAll('[data-ng-click], [ng-click]').forEach(el => {
+                const text = (el.textContent || '').trim();
+                const ngClick = el.getAttribute('data-ng-click') || el.getAttribute('ng-click');
+                if (!text || !ngClick) return;
+
+                const funcMatch = ngClick.match(/(\\w+)\\s*\\(/);
+                if (!funcMatch) return;
+                const funcName = funcMatch[1];
+
+                try {
+                    const scope = angular.element(el).scope();
+                    if (scope && typeof scope[funcName] === 'function') {
+                        const src = scope[funcName].toString();
+                        const urls = [];
+                        let m;
+                        const pat = new RegExp(URL_PATTERN.source, 'g');
+                        while ((m = pat.exec(src)) !== null) urls.push(m[1]);
+
+                        if (urls.length) {
+                            results.push({
+                                text: text.substring(0, 30),
+                                type: 'angularjs_click',
+                                handler_name: funcName,
+                                ajax_urls: [...new Set(urls)]
+                            });
+                        }
+                    }
+                } catch(e) {}
+            });
+
+            return results;
+        }""")
+
+    async def install_xhr_patch(self):
+        """XHR/fetch monkey-patch 설치 — SPA에서 AI가 클릭하기 전에 호출"""
+        page = await self.ensure_browser()
+        await page.evaluate("""() => {
+            if (window.__xhr_patched) return 'already_patched';
+            const captured = [];
+            const origOpen = XMLHttpRequest.prototype.open;
+            const origSend = XMLHttpRequest.prototype.send;
+            XMLHttpRequest.prototype.open = function(m, u) {
+                this._m = m; this._u = u;
+                return origOpen.apply(this, arguments);
+            };
+            XMLHttpRequest.prototype.send = function(b) {
+                if (this._u && !this._u.endsWith('.js') && !this._u.endsWith('.css'))
+                    captured.push({method: this._m, url: this._u, body: b ? String(b).substring(0, 200) : null, ts: Date.now()});
+                return origSend.apply(this, arguments);
+            };
+            const origFetch = window.fetch;
+            window.fetch = function(u, o) {
+                const url = String(u);
+                if (!url.endsWith('.js') && !url.endsWith('.css'))
+                    captured.push({method: o?.method || 'GET', url, body: o?.body ? String(o.body).substring(0, 200) : null, ts: Date.now()});
+                return origFetch.apply(this, arguments);
+            };
+            window.__captured = captured;
+            window.__xhr_patched = true;
+            return 'patched';
+        }""")
+
+    async def get_captured_requests(self, since: int = 0) -> list:
+        """패치 설치 후 캡처된 API 요청 반환 (CSS/JS/이미지 제외)"""
+        page = await self.ensure_browser()
+        return await page.evaluate("""(since) => {
+            const all = window.__captured || [];
+            return all.slice(since).filter(r =>
+                !r.url.includes('/Content/') && !r.url.includes('/bundles/') &&
+                !r.url.endsWith('.png') && !r.url.endsWith('.gif') && !r.url.endsWith('.jpg')
+            );
+        }""", since)
+
+    async def _extract_dynamic_capture(self) -> list:
+        """Layer 3: XHR/fetch 패치만 설치. 실제 클릭은 AI가 직접 수행."""
+        await self.install_xhr_patch()
+
+        # AI가 직접 screenshot + click_element + get_network_log로 탐색
+        # 여기서는 패치만 설치하고, 캡처된 요청은 get_captured_requests()로 조회
+        return []

@@ -762,6 +762,12 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
         else:
             detected_type = "unknown"
 
+    # 3계층 API 추출 (button_actions)
+    try:
+        button_result = await _engine.extract_button_actions()
+    except Exception:
+        button_result = {"framework": {}, "button_actions": [], "extraction_layers_used": []}
+
     result = {
         "detected_type": detected_type,
         "url": analysis["url"],
@@ -771,6 +777,9 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
         "buttons": analysis["buttons"],
         "all_links": analysis["all_links"],
         "js_handlers": analysis["js_handlers"],
+        "button_actions": button_result.get("button_actions", []),
+        "framework": button_result.get("framework", {}),
+        "extraction_layers_used": button_result.get("extraction_layers_used", []),
         "html_forms_raw": analysis["html_forms_raw"],
         "recent_post_requests": recent_posts,
         "cookies": cookie_names,
@@ -787,7 +796,8 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
             "has_date_inputs": any(
                 any(f.get("is_date") for f in form.get("fields", []))
                 for form in analysis["forms"]
-            )
+            ),
+            "has_api_actions": len([a for a in button_result.get("button_actions", []) if a.get("api") or a.get("ajax_urls")]) > 0
         }
     }
 
