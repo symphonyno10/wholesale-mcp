@@ -377,7 +377,7 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
         raise ValueError(f"로그인 먼저 필요: {site_id}")
 
     products = executor.search(keyword, edi_code or None, max_pages=max_pages)
-    return json.dumps([{
+    items = [{
         "product_code": p.product_code,
         "product_name": p.product_name,
         "edi_code": p.edi_code,
@@ -386,7 +386,23 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
         "stock_quantity": p.stock_quantity,
         "pack_unit": p.pack_unit,
         "pack_units": p.pack_units,
-    } for p in products], ensure_ascii=False, indent=2)
+    } for p in products]
+
+    # 결과가 많으면 파일로 저장하고 요약만 반환
+    MAX_INLINE = 20
+    if len(items) > MAX_INLINE:
+        data_dir = DATA_DIR / "data"
+        data_dir.mkdir(exist_ok=True)
+        fpath = data_dir / f"search_{site_id}_{keyword}.json"
+        fpath.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        return json.dumps({
+            "total": len(items),
+            "saved_to": str(fpath),
+            "sample": items[:5],
+            "message": f"결과 {len(items)}건. 상위 5건만 표시. 전체는 {fpath} 파일 참조."
+        }, ensure_ascii=False, indent=2)
+
+    return json.dumps(items, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -490,20 +506,43 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
         product_filter=product_filter
     )
 
+    items = [{
+        "date": e.transaction_date,
+        "product_name": e.product_name,
+        "pack_unit": e.pack_unit,
+        "quantity": e.quantity,
+        "unit_price": e.unit_price,
+        "sales_amount": e.sales_amount,
+        "balance": e.balance,
+    } for e in entries]
+
+    total_amount = sum(e.sales_amount for e in entries if e.sales_amount)
+
+    # 결과가 많으면 파일로 저장하고 요약만 반환
+    MAX_INLINE = 20
+    if len(items) > MAX_INLINE:
+        data_dir = DATA_DIR / "data"
+        data_dir.mkdir(exist_ok=True)
+        fpath = data_dir / f"ledger_{site_id}.json"
+        fpath.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        return json.dumps({
+            "site_id": site_id,
+            "period": f"{start_date or '(auto)'} ~ {end_date or '(today)'}",
+            "detail_mode": "약품별 상세" if detail else "일자별 요약",
+            "total_entries": len(items),
+            "total_amount": total_amount,
+            "saved_to": str(fpath),
+            "sample": items[:5],
+            "message": f"매출원장 {len(items)}건 (합계 {total_amount:,.0f}원). 상위 5건만 표시. 전체는 {fpath} 파일 참조."
+        }, ensure_ascii=False, indent=2)
+
     return json.dumps({
         "site_id": site_id,
         "period": f"{start_date or '(auto)'} ~ {end_date or '(today)'}",
         "detail_mode": "약품별 상세" if detail else "일자별 요약",
-        "total_entries": len(entries),
-        "entries": [{
-            "date": e.transaction_date,
-            "product_name": e.product_name,
-            "pack_unit": e.pack_unit,
-            "quantity": e.quantity,
-            "unit_price": e.unit_price,
-            "sales_amount": e.sales_amount,
-            "balance": e.balance,
-        } for e in entries]
+        "total_entries": len(items),
+        "total_amount": total_amount,
+        "entries": items
     }, ensure_ascii=False, indent=2)
 
 
