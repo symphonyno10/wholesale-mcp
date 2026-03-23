@@ -144,6 +144,7 @@ class BrowserEngine:
 
         ctx = await self._browser.new_context(
             viewport={"width": 1920, "height": 1080},
+            device_scale_factor=1,
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
         self._page = await ctx.new_page()
