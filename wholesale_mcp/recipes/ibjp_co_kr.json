@@ -1,0 +1,118 @@
+{
+  "site_id": "ibjp_co_kr",
+  "site_name": "백제약품",
+  "site_url": "https://www.ibjp.co.kr",
+  "encoding": "utf-8",
+  "recipe_version": 4,
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "/jwt/login",
+    "content_type": "application/json",
+    "payload": {
+      "loginId": "{username}",
+      "pwd": "{password}",
+      "companyYn": "N"
+    },
+    "token": {
+      "path": "accessToken",
+      "header": "Authorization",
+      "prefix": "Bearer ",
+      "user_data_path": "userData"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "accessToken",
+      "value": ""
+    }
+  },
+  "search": {
+    "method": "GET",
+    "url": "/ord/itemSearch",
+    "params": {
+      "keyword": "{keyword}",
+      "makerNm": "",
+      "history": "N",
+      "excludingOutOfOtock": "N",
+      "custCd": "{CUST_CD}",
+      "custGbCd": "{CUST_GB_CD}",
+      "ordMakerCd": "",
+      "userGbCd": "{USER_GB_CD}",
+      "ing": "N",
+      "eff": "N",
+      "ingno": "AAAAAAAAAAAAAA",
+      "effno": "AAAAAAAAAAAA",
+      "searchAll": "Y",
+      "professionalYn": "N",
+      "generalYn": "N",
+      "paymentYn": "N",
+      "nonPaymentYn": "N",
+      "searchOption": "0"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM_UNIT",
+        "manufacturer": "MAKER_NM",
+        "pack_unit": "UNIT",
+        "unit_price": "ORD_WP2_AMT",
+        "stock_quantity": "AVAIL_STOCK",
+        "edi_code": "BOHUM_CD",
+        "insurance_type": "PAY_ITEM_NM"
+      }
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "/ord/addBasket",
+    "content_type": "application/json",
+    "payload": {
+      "basketGbCd": "01",
+      "saveItemCd": "{product_code}",
+      "saveItemGbCd": "01",
+      "dlvBrchCd": "{DLV_BRCH_CD}",
+      "saveItemQty": "{quantity}",
+      "userId": "{USER_ID}",
+      "custCd": "{CUST_CD}"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상적으로 처리"
+    }
+  },
+  "cart_view": {
+    "method": "GET",
+    "url": "/ord/basketList",
+    "params": {
+      "userGbCd": "{USER_GB_CD}",
+      "custCd": "{CUST_CD}",
+      "basketGbCd": "01",
+      "gDlvBrchFlag": ""
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "",
+      "fields": {
+        "product_code": "ITEM_CD",
+        "product_name": "ITEM_NM",
+        "quantity": "ITEM_QTY",
+        "unit_price": "ORD_WP2_AMT"
+      }
+    }
+  },
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": false,
+    "cart_clear": false,
+    "sales_ledger": false,
+    "pagination": false
+  }
+}
