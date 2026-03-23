@@ -705,65 +705,7 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
         return result;
     }""")
 
-    # 외부 JS 파일에서 API 엔드포인트 추출 (Order.js 등)
-    try:
-        external_ajax = await page.evaluate("""async () => {
-            const scripts = Array.from(document.querySelectorAll('script[src]'))
-                .map(s => s.src)
-                .filter(s => !s.includes('jquery') && !s.includes('swiper') && !s.includes('kakao'));
-
-            const results = {external_js_files: [], ajax_urls: [], cart_functions: []};
-
-            for (const src of scripts.slice(0, 5)) {
-                try {
-                    const resp = await fetch(src);
-                    const text = await resp.text();
-                    const fileName = src.split('/').pop().split('?')[0];
-                    results.external_js_files.push(fileName);
-
-                    // AJAX URL 추출 (다양한 패턴 대응)
-                    const patterns = [
-                        /\\$\\.(?:post|ajax|get)\\s*\\(\\s*['\"]([^'\"]+)['\"]/g,
-                        /fetch\\s*\\(\\s*['\"]([^'\"]+)['\"]/g,
-                        /url\\s*[=:]\\s*['\"](\\/[^'\"]+)['\"]/g,
-                        /GetAjax\\s*\\(\\s*['\"]([^'\"]+)['\"]/g,
-                        /['\"](\\/(?:Home|Service|Api|Member|MyPage)\\/\\w[^'\"]*)['"]/g
-                    ];
-                    for (const pat of patterns) {
-                        let m;
-                        while ((m = pat.exec(text)) !== null) {
-                            const u = m[1];
-                            if (u && !u.endsWith('.js') && !u.endsWith('.css') && !u.endsWith('.png')) {
-                                results.ajax_urls.push(u);
-                            }
-                        }
-                    }
-
-                    // 장바구니/주문 함수명
-                    const funcPat = /function\\s+(\\w*(?:cart|bag|order|save|add|submit)\\w*)\\s*\\(/gi;
-                    let fm;
-                    while ((fm = funcPat.exec(text)) !== null) {
-                        results.cart_functions.push(fm[1]);
-                    }
-                } catch(e) {}
-            }
-
-            results.ajax_urls = [...new Set(results.ajax_urls)];
-            results.cart_functions = [...new Set(results.cart_functions)];
-            return results;
-        }""")
-
-        # 외부 JS 결과를 js_handlers에 병합
-        if external_ajax:
-            existing = analysis.get("js_handlers", {})
-            existing["external_js_files"] = external_ajax.get("external_js_files", [])
-            existing["ajax_urls"] = list(set(
-                existing.get("ajax_urls", []) + external_ajax.get("ajax_urls", [])
-            ))
-            existing["cart_functions"] = external_ajax.get("cart_functions", [])
-            analysis["js_handlers"] = existing
-    except Exception:
-        pass
+    # 외부 JS fetch 제거됨 — button_actions (3계층 추출)가 대체
 
     # 네트워크 로그에서 POST 요청 추출
     recent_posts = [req for req in _engine.network_log[-20:] if req.get("method") == "POST"]

@@ -174,14 +174,14 @@ class BrowserEngine:
                 if "json" in ct:
                     try:
                         body = await response.text()
-                        entry["body_preview"] = body[:2000]
+                        entry["body_preview"] = body[:500]
                     except Exception:
                         pass
                 elif "html" in ct:
                     try:
                         body = await response.text()
                         entry["body_size"] = len(body)
-                        entry["body_preview"] = body[:2000]
+                        entry["body_preview"] = body[:500]
                     except Exception:
                         pass
                 self.network_log.append(entry)
@@ -294,10 +294,17 @@ class BrowserEngine:
             filtered = [e for e in filtered if url_filter.lower() in e["url"].lower()]
         if method_filter:
             filtered = [e for e in filtered if e["method"].upper() == method_filter.upper()]
+        # 반환 시 body_preview를 200자로 제한 (AI 토큰 절약)
+        trimmed = []
+        for e in filtered[-30:]:
+            entry = {k: v for k, v in e.items()}
+            if "body_preview" in entry:
+                entry["body_preview"] = entry["body_preview"][:200]
+            trimmed.append(entry)
         return {
             "total": len(self.network_log),
             "filtered": len(filtered),
-            "requests": filtered[-50:]
+            "requests": trimmed
         }
 
     async def get_html(self, selector: str = "") -> str:
