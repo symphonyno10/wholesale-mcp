@@ -19,7 +19,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from site_executor import SiteExecutor
+from wholesale_mcp.site_executor import SiteExecutor
 
 
 def load_recipe(site_id, recipe_dir="recipes"):

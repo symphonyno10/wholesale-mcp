@@ -77,8 +77,8 @@ echo "로그 파일: $LOG_FILE"
 echo ""
 
 echo "$PROMPT" | claude -p \
-  --verbose \
-  --allowedTools "mcp__wholesale-tools__open_site,mcp__wholesale-tools__snapshot_page,mcp__wholesale-tools__snapshot_iframe,mcp__wholesale-tools__analyze_page_for_recipe,mcp__wholesale-tools__fill_input,mcp__wholesale-tools__click_element,mcp__wholesale-tools__submit_form,mcp__wholesale-tools__capture_form_submission,mcp__wholesale-tools__get_network_log,mcp__wholesale-tools__get_page_html,mcp__wholesale-tools__execute_js,mcp__wholesale-tools__screenshot,mcp__wholesale-tools__get_cookies,mcp__wholesale-tools__set_cookies,mcp__wholesale-tools__save_recipe,mcp__wholesale-tools__close_browser,mcp__wholesale-tools__generate_recipe_spec,mcp__wholesale-tools__get_recipe,mcp__wholesale-tools__list_sites,Read" \
+  --verbose --output-format stream-json \
+  --allowedTools "mcp__wholesale-tools__open_site,mcp__wholesale-tools__snapshot_page,mcp__wholesale-tools__snapshot_iframe,mcp__wholesale-tools__analyze_page_for_recipe,mcp__wholesale-tools__fill_input,mcp__wholesale-tools__click_element,mcp__wholesale-tools__submit_form,mcp__wholesale-tools__capture_form_submission,mcp__wholesale-tools__get_network_log,mcp__wholesale-tools__get_page_html,mcp__wholesale-tools__execute_js,mcp__wholesale-tools__screenshot,mcp__wholesale-tools__get_cookies,mcp__wholesale-tools__set_cookies,mcp__wholesale-tools__save_recipe,mcp__wholesale-tools__close_browser,mcp__wholesale-tools__generate_recipe_spec,mcp__wholesale-tools__get_recipe,mcp__wholesale-tools__list_sites,mcp__wholesale-tools__recipe_login,mcp__wholesale-tools__recipe_search,mcp__wholesale-tools__recipe_add_to_cart,mcp__wholesale-tools__recipe_view_cart,mcp__wholesale-tools__recipe_delete_from_cart,mcp__wholesale-tools__recipe_clear_cart,mcp__wholesale-tools__recipe_sales_ledger,mcp__wholesale-tools__share_recipe" \
   2>&1 | tee "$LOG_FILE"
 
 echo ""
