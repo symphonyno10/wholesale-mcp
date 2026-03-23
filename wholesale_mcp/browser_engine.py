@@ -150,9 +150,22 @@ class BrowserEngine:
         self._page = await ctx.new_page()
         self.network_log = []
 
-        # confirm/alert/prompt 다이얼로그 자동 수락
+        # confirm/alert/prompt 다이얼로그 자동 수락 (반복 방지)
+        self._dialog_count = 0
+        self._last_dialog_msg = ""
         async def _on_dialog(dialog):
-            await dialog.accept()
+            msg = dialog.message
+            if msg == self._last_dialog_msg:
+                self._dialog_count += 1
+            else:
+                self._dialog_count = 1
+                self._last_dialog_msg = msg
+            # 같은 메시지가 3번 이상 반복되면 dismiss (무한 루프 방지)
+            if self._dialog_count >= 3:
+                logger.warning(f"다이얼로그 반복 감지 ({self._dialog_count}회): {msg[:50]} → dismiss")
+                await dialog.dismiss()
+            else:
+                await dialog.accept()
         self._page.on("dialog", _on_dialog)
 
         # 네트워크 캡처 핸들러
