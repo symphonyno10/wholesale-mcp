@@ -22,24 +22,12 @@
   "user_config": {
     "data_dir": {
       "type": "directory",
-      "label": "데이터 저장 위치",
+      "title": "데이터 저장 위치",
       "description": "아이디/비밀번호, 레시피, 매출원장 데이터가 저장됩니다",
       "default": ["${HOME}/wholesale-mcp-data"]
     }
   },
-  "tools": [
-    {"name": "auto_login_all", "description": "등록된 모든 도매사이트에 자동 로그인"},
-    {"name": "recipe_search", "description": "약품 검색 (키워드/EDI코드)"},
-    {"name": "recipe_add_to_cart", "description": "장바구니에 약품 추가"},
-    {"name": "recipe_view_cart", "description": "장바구니 조회"},
-    {"name": "recipe_delete_from_cart", "description": "장바구니에서 약품 삭제"},
-    {"name": "recipe_clear_cart", "description": "장바구니 전체 비우기"},
-    {"name": "recipe_sales_ledger", "description": "매출원장 조회 (기간별)"},
-    {"name": "register_site", "description": "새 도매사이트 등록 (URL + ID + PW)"},
-    {"name": "list_sites", "description": "등록된 사이트 목록 + 로그인 상태"}
-  ],
   "compatibility": {
-    "platforms": ["windows-x64"],
-    "clients": ["claude-desktop"]
+    "platforms": ["win32"]
   }
 }
