@@ -31,7 +31,7 @@ jobs:
 
       - name: Build .exe with PyInstaller
         run: |
-          pyinstaller wholesale_mcp/server.py --onefile --name wholesale-mcp --hidden-import wholesale_mcp --hidden-import wholesale_mcp.site_executor --hidden-import wholesale_mcp.browser_engine --hidden-import wholesale_mcp.recipe_normalizer --hidden-import wholesale_mcp.recipe_schema
+          pyinstaller entry_point.py --onefile --name wholesale-mcp --hidden-import wholesale_mcp --hidden-import wholesale_mcp.server --hidden-import wholesale_mcp.site_executor --hidden-import wholesale_mcp.browser_engine --hidden-import wholesale_mcp.recipe_normalizer --hidden-import wholesale_mcp.recipe_schema --add-data "wholesale_mcp;wholesale_mcp" --add-data "recipes;recipes"
 
       - name: Assemble extension
         run: |
