@@ -480,6 +480,7 @@ def get_session_info(site_id: str) -> str:
         "authenticated": executor.is_authenticated(),
         "cookies": cookies,
         "headers": dict(executor.session.headers),
+        "login_data": executor._login_data,
     }, ensure_ascii=False, indent=2)
 
 
