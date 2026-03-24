@@ -57,16 +57,16 @@
           "selector": "td:nth-child(2)",
           "attribute": "text"
         },
-        "specification": {
-          "selector": "td:nth-child(4)",
-          "attribute": "text"
-        },
         "unit_price": {
           "selector": "input[name^=price_]",
           "attribute": "value"
         },
         "stock_quantity": {
           "selector": "td:nth-child(8)",
+          "attribute": "text"
+        },
+        "pack_unit": {
+          "selector": "td:nth-child(4)",
           "attribute": "text"
         }
       }
@@ -175,10 +175,6 @@
           "selector": "td:nth-child(3)",
           "attribute": "text"
         },
-        "specification": {
-          "selector": "td:nth-child(4)",
-          "attribute": "text"
-        },
         "quantity": {
           "selector": "td:nth-child(5)",
           "attribute": "text"
@@ -189,6 +185,10 @@
         },
         "sales_amount": {
           "selector": "td:nth-child(7)",
+          "attribute": "text"
+        },
+        "pack_unit": {
+          "selector": "td:nth-child(4)",
           "attribute": "text"
         }
       }

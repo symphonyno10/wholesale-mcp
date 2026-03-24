@@ -33,7 +33,10 @@ _FIELD_NAME_MAP = {
     'goods_code': 'product_code',
     'it_id': 'product_code',
     'maker': 'manufacturer',
-    'standard': 'specification',
+    'standard': 'pack_unit',
+    'specification': 'pack_unit',
+    'spec': 'pack_unit',
+    'std': 'pack_unit',
 }
 
 

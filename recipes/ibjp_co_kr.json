@@ -162,7 +162,7 @@
     "cart_add": true,
     "cart_view": true,
     "cart_delete": true,
-    "cart_clear": true,
+    "cart_clear": false,
     "sales_ledger": true
   }
 }
