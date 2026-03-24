@@ -336,8 +336,16 @@ def auto_login_all() -> str:
 @mcp.tool()
 def list_sites() -> str:
     """등록된 도매사이트 목록 (JSON 레시피 파일 기반)"""
-    recipes = _load_recipes()
-    creds = _load_credentials()
+    try:
+        recipes = _load_recipes()
+    except Exception as e:
+        logger.error(f"레시피 로드 실패: {e}")
+        return json.dumps([], ensure_ascii=False)
+    try:
+        creds = _load_credentials()
+    except Exception as e:
+        logger.error(f"크레덴셜 로드 실패: {e}")
+        creds = {}
     sites = []
     for sid, r in recipes.items():
         # available_features가 레시피에 있으면 사용, 없으면 섹션 유무로 판단
