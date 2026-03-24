@@ -160,8 +160,8 @@ class BrowserEngine:
             else:
                 self._dialog_count = 1
                 self._last_dialog_msg = msg
-            # 같은 메시지가 3번 이상 반복되면 dismiss (무한 루프 방지)
-            if self._dialog_count >= 3:
+            # 같은 메시지가 2번 이상 반복되면 dismiss (무한 루프 방지)
+            if self._dialog_count >= 2:
                 logger.warning(f"다이얼로그 반복 감지 ({self._dialog_count}회): {msg[:50]} → dismiss")
                 await dialog.dismiss()
             else:

@@ -440,10 +440,23 @@ def recipe_view_cart(site_id: str) -> str:
 
 @mcp.tool()
 def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
-    """장바구니에서 특정 상품 삭제"""
+    """장바구니에서 특정 상품 삭제. 장바구니가 비어있으면 실행하지 않는다."""
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
         raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    # 장바구니 비어있으면 실행 거부 (빈 장바구니 삭제 → 무한 팝업 방지)
+    try:
+        items = executor.view_cart()
+        if not items:
+            return json.dumps({
+                "success": False,
+                "site_id": site_id,
+                "product_code": product_code,
+                "error": "장바구니가 비어있습니다. 삭제할 상품이 없습니다."
+            }, ensure_ascii=False, indent=2)
+    except Exception:
+        pass  # view_cart 실패해도 삭제 시도는 허용
 
     ok = executor.delete_from_cart(product_code)
     return json.dumps({
@@ -455,10 +468,22 @@ def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
 
 @mcp.tool()
 def recipe_clear_cart(site_id: str) -> str:
-    """장바구니 전체 비우기"""
+    """장바구니 전체 비우기. 장바구니가 비어있으면 실행하지 않는다."""
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
         raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    # 장바구니 비어있으면 실행 거부 (빈 장바구니 비우기 → 무한 팝업 방지)
+    try:
+        items = executor.view_cart()
+        if not items:
+            return json.dumps({
+                "success": True,
+                "site_id": site_id,
+                "message": "장바구니가 이미 비어있습니다."
+            }, ensure_ascii=False, indent=2)
+    except Exception:
+        pass  # view_cart 실패해도 비우기 시도는 허용
 
     ok = executor.clear_cart()
     return json.dumps({
