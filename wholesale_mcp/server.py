@@ -20,8 +20,22 @@ from mcp.server.fastmcp import FastMCP
 from .browser_engine import BrowserEngine, SNAPSHOT_JS
 
 PACKAGE_DIR = Path(__file__).resolve().parent          # wholesale_mcp/ (번들 레시피)
-DATA_DIR = Path(os.environ.get("WHOLESALE_MCP_DATA_DIR", "")).resolve() \
-    if os.environ.get("WHOLESALE_MCP_DATA_DIR") else Path.cwd()  # 사용자 데이터
+# 데이터 디렉토리: 환경변수 > APPDATA > home > exe 위치 > cwd
+def _resolve_data_dir() -> Path:
+    env_dir = os.environ.get("WHOLESALE_MCP_DATA_DIR", "")
+    if env_dir and "${" not in env_dir:
+        return Path(env_dir).resolve()
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        return Path(appdata) / "wholesale-mcp"
+    home = Path.home()
+    if home != Path("/"):
+        return home / ".wholesale-mcp"
+    if getattr(sys, 'frozen', False):
+        return Path(sys.executable).parent / "data"
+    return Path.cwd()
+
+DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # 최초 실행 시 번들 레시피를 사용자 폴더에 복사 (.mcpb 설치 후 최초 1회)
