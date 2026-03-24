@@ -404,16 +404,33 @@ class BrowserEngine:
             'generic', 'none', 'presentation', 'StaticText',
             'InlineTextBox', 'LineBreak', 'paragraph',
         }
+        # 입력 필드는 name 대신 description(placeholder)을 사용할 수 있음
+        input_roles = {'textbox', 'combobox', 'searchbox', 'spinbutton'}
         nodes = []
         for n in tree.get('nodes', []):
             role = n.get('role', {}).get('value', '')
             name = n.get('name', {}).get('value', '')
-            if not name or len(name.strip()) < 2 or role in skip_roles:
+            desc = n.get('description', {}).get('value', '') if 'description' in n else ''
+
+            if role in skip_roles:
                 continue
-            node = {'role': role, 'name': name.strip()[:100]}
+
+            # 입력 필드: name 없어도 description(placeholder)으로 포함
+            if role in input_roles:
+                label = name or desc
+                if not label or len(label.strip()) < 2:
+                    continue
+                node = {'role': role, 'name': label.strip()[:100]}
+            else:
+                if not name or len(name.strip()) < 2:
+                    continue
+                node = {'role': role, 'name': name.strip()[:100]}
+
             val = n.get('value', {}).get('value', '') if 'value' in n else ''
             if val:
                 node['value'] = str(val)[:50]
+            if desc and desc != node['name']:
+                node['description'] = desc.strip()[:100]
             nodes.append(node)
         return nodes
 
