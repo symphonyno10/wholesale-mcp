@@ -79,6 +79,17 @@ def _load_credentials() -> dict:
     return _credentials
 
 
+def _get_credential(site_id: str) -> dict | None:
+    """site_id로 credential 조회. _auto/_test suffix fallback 지원."""
+    creds = _load_credentials()
+    cred = creds.get(site_id)
+    if not cred:
+        # _auto, _test suffix 제거 후 재시도
+        base_id = site_id.replace('_auto', '').replace('_test', '').rstrip('_')
+        cred = creds.get(base_id)
+    return cred
+
+
 def _load_recipes() -> dict:
     """번들 + 사용자 recipes/ 디렉토리에서 레시피 JSON 로드"""
     global _recipes
@@ -372,27 +383,31 @@ def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
     if not recipe:
         raise ValueError(f"레시피 없음: {site_id}")
 
-    # credentials.json에서 자동 로드
-    creds = _load_credentials().get(site_id, {})
+    # credentials.json에서 자동 로드 (_auto fallback 포함)
+    cred = _get_credential(site_id) or {}
     if not username or not password:
-        username = username or creds.get("username", "")
-        password = password or creds.get("password", "")
+        username = username or cred.get("username", "")
+        password = password or cred.get("password", "")
     if not username or not password:
         raise ValueError(f"로그인 정보 없음: credentials.json에 {site_id} 추가 필요")
 
     # site_params: 사용자별 고유 값 (거래처 코드 등)
-    site_params = creds.get("site_params", {})
+    site_params = cred.get("site_params", {})
 
     from .site_executor import SiteExecutor
     executor = SiteExecutor(recipe)
     ok = executor.login(username, password, site_params=site_params)
     if ok:
         _executors[site_id] = executor
+
+    cookie_names = [c.name for c in executor.session.cookies]
     return json.dumps({
         "success": ok,
         "site_id": site_id,
         "authenticated": executor.is_authenticated(),
-        "cookies": len(executor.session.cookies)
+        "cookies": len(cookie_names),
+        "cookie_names": cookie_names,
+        "login_data_keys": list(executor._login_data.keys()) if hasattr(executor, '_login_data') else []
     }, ensure_ascii=False)
 
 
@@ -569,10 +584,14 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
         "balance": e.balance,
     } for e in entries]
 
-    total_amount = sum(e.sales_amount for e in entries if e.sales_amount)
+    # 서버 측 후처리 필터 — 사이트가 product_filter를 무시하는 경우 대비
+    if product_filter:
+        items = [i for i in items if product_filter.lower() in (i.get('product_name', '') or '').lower()]
 
-    # 결과가 많으면 파일로 저장하고 요약만 반환
-    MAX_INLINE = 20
+    total_amount = sum(i.get('sales_amount', 0) or 0 for i in items)
+
+    # 필터 적용 후 결과가 적으면 인라인, 대량이면 파일 저장
+    MAX_INLINE = 200 if product_filter else 20
     if len(items) > MAX_INLINE:
         data_dir = DATA_DIR / "data"
         data_dir.mkdir(exist_ok=True)
@@ -1292,23 +1311,60 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
 
 
 @mcp.tool()
-def read_project_file(file_path: str) -> str:
-    """프로젝트 디렉토리 내 파일 읽기 (credentials.json, recipes/*.json 등).
+def read_project_file(file_path: str, offset: int = 0, limit: int = 200,
+                      keyword: str = "") -> str:
+    """데이터 파일 읽기 (매출원장 JSON, 레시피 등).
 
-    보안: 프로젝트 디렉토리 외부 파일은 읽을 수 없습니다.
+    Parameters:
+    - file_path: 파일 경로 (상대 또는 절대)
+    - offset: 건너뛸 항목 수 (JSON 배열인 경우)
+    - limit: 반환할 최대 항목 수 (기본 200)
+    - keyword: 약품명 검색 필터 (JSON 배열의 product_name 필드에서 검색)
+
+    보안: 데이터 디렉토리 내부 파일만 접근 가능.
     """
-    from pathlib import Path
-    target = Path(file_path).resolve()
     project_root = DATA_DIR.resolve()
 
-    # 보안: 프로젝트 디렉토리 내부만 허용
-    if not str(target).startswith(str(project_root)):
-        raise ValueError(f"프로젝트 디렉토리 외부 파일은 읽을 수 없습니다: {file_path}")
+    # 상대경로 → DATA_DIR 기준으로 resolve
+    p = Path(file_path)
+    if p.is_absolute():
+        target = p.resolve()
+    else:
+        target = (DATA_DIR / file_path).resolve()
+
+    # 보안: 데이터 디렉토리 내부만 허용
+    try:
+        target.relative_to(project_root)
+    except ValueError:
+        raise ValueError(f"데이터 디렉토리 외부 파일은 읽을 수 없습니다: {file_path}")
 
     if not target.exists():
         raise ValueError(f"파일이 없습니다: {file_path}")
 
-    return target.read_text(encoding='utf-8')
+    # JSON 파일이면 항목별 검색/페이징 지원
+    if target.suffix == '.json':
+        data = json.loads(target.read_text(encoding='utf-8'))
+        if isinstance(data, list):
+            # 키워드 필터
+            if keyword:
+                data = [item for item in data
+                        if keyword.lower() in json.dumps(item, ensure_ascii=False).lower()]
+            total = len(data)
+            sliced = data[offset:offset + limit]
+            return json.dumps({
+                "total": total,
+                "offset": offset,
+                "limit": limit,
+                "keyword": keyword,
+                "count": len(sliced),
+                "items": sliced
+            }, ensure_ascii=False, indent=2)
+
+    # 일반 텍스트
+    text = target.read_text(encoding='utf-8')
+    if len(text) > 500_000:
+        return text[:500_000] + f"\n\n... (파일 크기 {len(text):,} bytes, 500KB까지 표시)"
+    return text
 
 
 @mcp.tool()
