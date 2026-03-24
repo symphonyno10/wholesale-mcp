@@ -383,6 +383,40 @@ class BrowserEngine:
         await self.wait_for_stable(5000)
         return self.network_log[before_count:]
 
+    async def get_accessibility_tree(self) -> list[dict]:
+        """CDP 접근성 트리에서 의미 있는 노드만 추출.
+
+        Stagehand이 사용하는 것과 동일한 Chrome Accessibility Tree를
+        CDP로 직접 가져옵니다. DOM HTML 대비 80~90% 크기 축소.
+
+        Returns:
+            [{"role": "textbox", "name": "약품명", "value": "타이레놀"}, ...]
+        """
+        page = await self.ensure_browser()
+        ctx = page.context
+        client = await ctx.new_cdp_session(page)
+        try:
+            tree = await client.send('Accessibility.getFullAXTree')
+        finally:
+            await client.detach()
+
+        skip_roles = {
+            'generic', 'none', 'presentation', 'StaticText',
+            'InlineTextBox', 'LineBreak', 'paragraph',
+        }
+        nodes = []
+        for n in tree.get('nodes', []):
+            role = n.get('role', {}).get('value', '')
+            name = n.get('name', {}).get('value', '')
+            if not name or len(name.strip()) < 2 or role in skip_roles:
+                continue
+            node = {'role': role, 'name': name.strip()[:100]}
+            val = n.get('value', {}).get('value', '') if 'value' in n else ''
+            if val:
+                node['value'] = str(val)[:50]
+            nodes.append(node)
+        return nodes
+
     async def close(self):
         """브라우저 종료"""
         if self._browser:

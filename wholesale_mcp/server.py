@@ -924,6 +924,7 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
         "button_actions": button_result.get("button_actions", []),
         "framework": button_result.get("framework", {}),
         "recipe_draft": recipe_draft,
+        "accessibility_tree": await _engine.get_accessibility_tree(),
         "recent_post_requests": recent_posts,
         "cookies": cookie_names,
         "analysis_hints": {
