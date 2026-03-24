@@ -28,21 +28,14 @@ jobs:
 
       - name: Build .exe with PyInstaller
         run: |
-          pyinstaller wholesale_mcp/server.py ^
-            --onefile ^
-            --name wholesale-mcp ^
-            --hidden-import wholesale_mcp ^
-            --hidden-import wholesale_mcp.site_executor ^
-            --hidden-import wholesale_mcp.browser_engine ^
-            --hidden-import wholesale_mcp.recipe_normalizer ^
-            --hidden-import wholesale_mcp.recipe_schema
+          pyinstaller wholesale_mcp/server.py --onefile --name wholesale-mcp --hidden-import wholesale_mcp --hidden-import wholesale_mcp.site_executor --hidden-import wholesale_mcp.browser_engine --hidden-import wholesale_mcp.recipe_normalizer --hidden-import wholesale_mcp.recipe_schema
 
       - name: Assemble extension
         run: |
-          mkdir dist\extension\server
-          copy dist\wholesale-mcp.exe dist\extension\server\
-          xcopy recipes dist\extension\server\recipes\ /E /I
-          copy extension\manifest.json dist\extension\
+          New-Item -ItemType Directory -Force -Path dist/extension/server
+          Copy-Item dist/wholesale-mcp.exe dist/extension/server/
+          Copy-Item -Recurse recipes dist/extension/server/recipes
+          Copy-Item extension/manifest.json dist/extension/
 
       - name: Pack .mcpb
         run: |
