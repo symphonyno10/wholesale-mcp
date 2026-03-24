@@ -33,6 +33,7 @@ _engine = BrowserEngine()
 _executors: dict = {}  # site_id → SiteExecutor
 _credentials: dict = {}  # site_id → {username, password}
 _recipes: dict = {}    # site_id → recipe dict
+_last_recipe_draft: dict = {}  # 최근 analyze_page_for_recipe()의 recipe_draft (save_recipe 병합용)
 
 
 # ── 헬퍼 ──
@@ -972,6 +973,11 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
         }
     }
 
+    # recipe_draft를 전역에 저장 (save_recipe 자동 병합용)
+    global _last_recipe_draft
+    if recipe_draft:
+        _last_recipe_draft = recipe_draft
+
     return json.dumps(result, ensure_ascii=False, indent=2)
 
 
@@ -1206,6 +1212,28 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
     try:
         recipe = json.loads(recipe_json)
 
+        # ── recipe_draft 자동 병합: AI가 parsing을 빠뜨려도 도구가 보완 ──
+        global _last_recipe_draft
+        if _last_recipe_draft:
+            draft = _last_recipe_draft
+            # search.parsing이 없으면 recipe_draft에서 자동 채움
+            search = recipe.get("search", {})
+            if search and not search.get("parsing", {}).get("selector"):
+                st = draft.get("search_table", {})
+                if st.get("row_selector"):
+                    search.setdefault("parsing", {})["selector"] = st["row_selector"]
+                    if st.get("fields") and not search["parsing"].get("fields"):
+                        search["parsing"]["fields"] = st["fields"]
+                    recipe["search"] = search
+                    logger.info(f"[{site_id}] recipe_draft에서 search.parsing 자동 병합: {st['row_selector']}")
+
+            # search_form params가 비어있으면 draft에서 채움
+            sf = draft.get("search_form", {})
+            if sf.get("params") and not search.get("params"):
+                search["params"] = sf["params"]
+                recipe["search"] = search
+                logger.info(f"[{site_id}] recipe_draft에서 search.params 자동 병합")
+
         recipes_dir = DATA_DIR / "recipes"
         recipes_dir.mkdir(exist_ok=True)
 
@@ -1235,6 +1263,26 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
         raise ValueError(f"JSON 파싱 실패: {e}")
     except Exception as e:
         raise ValueError(f"저장 실패: {e}")
+
+
+@mcp.tool()
+def read_project_file(file_path: str) -> str:
+    """프로젝트 디렉토리 내 파일 읽기 (credentials.json, recipes/*.json 등).
+
+    보안: 프로젝트 디렉토리 외부 파일은 읽을 수 없습니다.
+    """
+    from pathlib import Path
+    target = Path(file_path).resolve()
+    project_root = DATA_DIR.resolve()
+
+    # 보안: 프로젝트 디렉토리 내부만 허용
+    if not str(target).startswith(str(project_root)):
+        raise ValueError(f"프로젝트 디렉토리 외부 파일은 읽을 수 없습니다: {file_path}")
+
+    if not target.exists():
+        raise ValueError(f"파일이 없습니다: {file_path}")
+
+    return target.read_text(encoding='utf-8')
 
 
 @mcp.tool()
