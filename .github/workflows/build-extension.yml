@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # v1.4.0 같은 태그 푸시 시 자동 빌드
 
+permissions:
+  contents: write
+
 jobs:
   build-windows:
     runs-on: windows-latest
