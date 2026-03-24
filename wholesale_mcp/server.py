@@ -22,6 +22,18 @@ from .browser_engine import BrowserEngine, SNAPSHOT_JS
 PACKAGE_DIR = Path(__file__).resolve().parent          # wholesale_mcp/ (번들 레시피)
 DATA_DIR = Path(os.environ.get("WHOLESALE_MCP_DATA_DIR", "")).resolve() \
     if os.environ.get("WHOLESALE_MCP_DATA_DIR") else Path.cwd()  # 사용자 데이터
+DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+# 최초 실행 시 번들 레시피를 사용자 폴더에 복사 (.mcpb 설치 후 최초 1회)
+_bundled_recipes = PACKAGE_DIR.parent / "recipes"
+_user_recipes = DATA_DIR / "recipes"
+if _bundled_recipes.exists() and _bundled_recipes.is_dir():
+    _user_recipes.mkdir(exist_ok=True)
+    import shutil
+    for src in _bundled_recipes.glob("*.json"):
+        dst = _user_recipes / src.name
+        if not dst.exists():
+            shutil.copy2(src, dst)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("wholesale-mcp")

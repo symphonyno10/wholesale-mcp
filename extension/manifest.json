@@ -1,0 +1,45 @@
+{
+  "manifest_version": "0.3",
+  "name": "wholesale-mcp",
+  "version": "1.4.0",
+  "description": "도매 약품 사이트 자동 주문 — 검색, 장바구니, 매출원장",
+  "author": {
+    "name": "symphonyno10",
+    "url": "https://github.com/symphonyno10/wholesale-mcp"
+  },
+  "server": {
+    "type": "binary",
+    "entry_point": "server/wholesale-mcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/wholesale-mcp.exe",
+      "args": [],
+      "env": {
+        "WHOLESALE_MCP_DATA_DIR": "${user_config.data_dir}",
+        "PLAYWRIGHT_BROWSERS_PATH": "${__dirname}/server/playwright-browsers"
+      }
+    }
+  },
+  "user_config": {
+    "data_dir": {
+      "type": "directory",
+      "label": "데이터 저장 위치",
+      "description": "아이디/비밀번호, 레시피, 매출원장 데이터가 저장됩니다",
+      "default": ["${HOME}/wholesale-mcp-data"]
+    }
+  },
+  "tools": [
+    {"name": "auto_login_all", "description": "등록된 모든 도매사이트에 자동 로그인"},
+    {"name": "recipe_search", "description": "약품 검색 (키워드/EDI코드)"},
+    {"name": "recipe_add_to_cart", "description": "장바구니에 약품 추가"},
+    {"name": "recipe_view_cart", "description": "장바구니 조회"},
+    {"name": "recipe_delete_from_cart", "description": "장바구니에서 약품 삭제"},
+    {"name": "recipe_clear_cart", "description": "장바구니 전체 비우기"},
+    {"name": "recipe_sales_ledger", "description": "매출원장 조회 (기간별)"},
+    {"name": "register_site", "description": "새 도매사이트 등록 (URL + ID + PW)"},
+    {"name": "list_sites", "description": "등록된 사이트 목록 + 로그인 상태"}
+  ],
+  "compatibility": {
+    "platforms": ["windows-x64"],
+    "clients": ["claude-desktop"]
+  }
+}
