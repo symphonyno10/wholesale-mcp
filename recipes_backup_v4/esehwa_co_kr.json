@@ -1,0 +1,166 @@
+{
+  "site_id": "esehwa_co_kr",
+  "site_name": "세화약품",
+  "site_url": "https://esehwa.co.kr",
+  "encoding": "utf-8",
+  "recipe_version": 4,
+  "connection": {
+    "request_interval_ms": 500,
+    "ssl_verify": true
+  },
+  "login": {
+    "method": "POST",
+    "url": "/common/ajax/user.asp",
+    "payload": {
+      "id": "{username}",
+      "pw": "{password}",
+      "mode": "login",
+      "chked": "false"
+    },
+    "success_indicator": {
+      "type": "status_code",
+      "value": 200
+    }
+  },
+  "search": {
+    "method": "GET",
+    "url": "/common/ajax/physic.asp",
+    "params": {
+      "f": "1",
+      "unityGu": "",
+      "physicNm": "{keyword}",
+      "venNm": "",
+      "insuCd": "",
+      "page": "1",
+      "often": "0",
+      "flag": "",
+      "physicCd": "",
+      "gu": "",
+      "rank": "",
+      "mask": "",
+      "consCd": "",
+      "consCdSeq": "",
+      "effect": "0",
+      "mode": "list"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "product_code": "physicCd",
+        "product_name": "physicNm",
+        "manufacturer": "makerNm",
+        "pack_unit": "std",
+        "unit_price": "unitCost",
+        "stock_quantity": "stock",
+        "remark": "soldoutMsg"
+      }
+    },
+    "pagination": {
+      "type": "param",
+      "page_param": "page",
+      "start_page": 1,
+      "total_pages_path": "totalPage",
+      "max_pages": 5
+    }
+  },
+  "cart_add": {
+    "method": "POST",
+    "url": "/common/ajax/bag.asp",
+    "payload": {
+      "physicCds": "{product_code}",
+      "qtys": "{quantity}",
+      "unitCosts": "0",
+      "mode": "valid_edit",
+      "ug": "",
+      "orderFlag": "1"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상처리"
+    }
+  },
+  "cart_view": {
+    "method": "GET",
+    "url": "/common/ajax/bag.asp",
+    "params": {
+      "mode": "list",
+      "ug": "",
+      "orderFlag": "1"
+    },
+    "response_type": "json",
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "product_code": "physicCd",
+        "product_name": "physicNm",
+        "quantity": "qty",
+        "unit_price": "price"
+      }
+    }
+  },
+  "cart_delete": {
+    "method": "POST",
+    "url": "/common/ajax/bag.asp",
+    "payload": {
+      "mode": "del",
+      "code": "{product_code}",
+      "ug": "",
+      "orderFlag": "1"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상처리"
+    }
+  },
+  "cart_clear": {
+    "method": "POST",
+    "url": "/common/ajax/bag.asp",
+    "payload": {
+      "mode": "delall",
+      "ug": "",
+      "orderFlag": "1"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상처리"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "/contents/order/saleledger.asp",
+    "date_format": "%Y-%m-%d",
+    "params": {
+      "ug": "",
+      "srchFlag": "1",
+      "sel_kind": "2",
+      "sel_srch_opt": "",
+      "tx_dateA": "{start_date}",
+      "tx_dateZ": "{end_date}",
+      "tx_physic_nm": "{product_filter}"
+    },
+    "response_type": "html",
+    "parsing": {
+      "selector": "table tbody tr",
+      "fields": {
+        "transaction_date": "td:nth-child(1)",
+        "product_name": "td:nth-child(3)",
+        "pack_unit": "td:nth-child(4)",
+        "quantity": "td:nth-child(5)",
+        "unit_price": "td:nth-child(6)",
+        "sales_amount": "td:nth-child(7)",
+        "balance": "td:nth-child(9)"
+      }
+    }
+  },
+  "available_features": {
+    "login": true,
+    "search": true,
+    "cart_add": true,
+    "cart_view": true,
+    "cart_delete": true,
+    "cart_clear": false,
+    "sales_ledger": true,
+    "pagination": true
+  }
+}

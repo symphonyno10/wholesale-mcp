@@ -1,18 +1,19 @@
 {
-  "site_id": "bpm_geoweb_kr_auto",
-  "site_name": "지오웹BPM",
+  "site_id": "bpm_geoweb_kr",
+  "site_name": "지오웹(지오영)",
   "site_url": "https://bpm.geoweb.kr",
   "encoding": "utf-8",
-  "recipe_version": "2.0",
+  "recipe_version": 4,
   "connection": {
-    "request_interval_ms": 500
+    "request_interval_ms": 500,
+    "ssl_verify": true
   },
   "login": {
-    "url": "/Member/Login",
     "method": "POST",
+    "url": "/Member/Login",
     "payload": {
-      "LoginID": "{USERNAME}",
-      "Password": "{PASSWORD}"
+      "LoginID": "{username}",
+      "Password": "{password}"
     },
     "success_indicator": {
       "type": "cookie",
@@ -20,13 +21,13 @@
     }
   },
   "search": {
-    "url": "/Home/PartialSearchProduct",
     "method": "POST",
+    "url": "/Home/PartialSearchProduct",
     "params": {
       "srchCate": "",
       "prdtType": "",
       "prdOrder": "3",
-      "srchText": "{KEYWORD}",
+      "srchText": "{keyword}",
       "srchCompany": "",
       "startdate": "",
       "enddate": ""
@@ -36,33 +37,27 @@
       "selector": "tr.tr-product-list",
       "fields": {
         "product_code": {
-          "selector": ".div-product-detail li:first-child",
+          "selector": ".div-product-detail ul li:first-child",
           "attribute": "text"
         },
         "product_name": "td.proName",
         "manufacturer": "td.phaCompany span",
         "pack_unit": "td.standard",
         "stock_quantity": "td.stock span",
-        "edi_code": "td.code"
+        "remark": {
+          "selector": ".div-product-detail ul li:nth-child(8)",
+          "attribute": "text"
+        }
       }
     }
   },
-  "product_detail": {
-    "url": "/Home/PartialProductInfo/{PRODUCT_CODE}",
-    "method": "POST",
-    "params": {
-      "num": "0"
-    },
-    "response_type": "html",
-    "note": "검색 결과에 단가 없음. 이 API로 개별 상품 단가 조회 가능. 응답 HTML 내 '주문단가' 행의 td에서 가격 추출."
-  },
   "cart_add": {
-    "url": "/Home/DataCart/add",
     "method": "POST",
+    "url": "/Home/DataCart/add",
     "payload": {
-      "productCode": "{PRODUCT_CODE}",
+      "productCode": "{product_code}",
       "moveCode": "",
-      "orderQty": "{QUANTITY}"
+      "orderQty": "{quantity}"
     },
     "success_indicator": {
       "type": "json_field",
@@ -71,20 +66,20 @@
     }
   },
   "cart_view": {
-    "url": "/Home/PartialProductCart",
     "method": "POST",
+    "url": "/Home/PartialProductCart",
     "response_type": "html",
     "parsing": {
       "selector": "tr.tr_cart_list",
       "fields": {
         "product_code": {
-          "selector": ".div_cart_detail li:first-child",
+          "selector": ".div_cart_detail ul li:first-child",
           "attribute": "text"
         },
         "product_name": "td.phaCompany",
         "quantity": {
-          "selector": ".div_cart_detail li:nth-child(4)",
-          "attribute": "text"
+          "selector": "td.quantity input",
+          "attribute": "value"
         },
         "unit_price": "td.unitPrice",
         "total_price": "td.amountMoney"
@@ -92,10 +87,10 @@
     }
   },
   "cart_delete": {
-    "url": "/Home/DataCart/del",
     "method": "POST",
+    "url": "/Home/DataCart/del",
     "payload": {
-      "productCode": "{PRODUCT_CODE}",
+      "productCode": "{product_code}",
       "moveCode": "",
       "orderQty": "0"
     },
@@ -106,8 +101,8 @@
     }
   },
   "cart_clear": {
-    "url": "/Home/DataCart/alldel",
     "method": "POST",
+    "url": "/Home/DataCart/alldel",
     "payload": {
       "productCode": "",
       "moveCode": "",
@@ -120,26 +115,21 @@
     }
   },
   "sales_ledger": {
-    "url": "/MyPage/SalesLedger",
     "method": "GET",
+    "url": "/MyPage/SalesLedger",
+    "date_format": "%Y-%m-%d",
     "params": {
-      "dtpFrom": "{START_DATE}",
-      "dtpTo": "{END_DATE}",
-      "printFlag": "{DETAIL_MODE}",
+      "dtpFrom": "{start_date}",
+      "dtpTo": "{end_date}",
+      "printFlag": "2",
       "srchFlag": ""
-    },
-    "detail_values": {
-      "detail": "2",
-      "summary": "1"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "tbody tr",
+      "selector": "table tbody tr",
       "fields": {
         "transaction_date": "td.date",
         "product_name": "td.proName",
-        "quantity": "td.quantity",
-        "unit_price": "td.salUnitPrice",
         "sales_amount": "td.salAmountMoney",
         "payment": "td.dipAmountMoney",
         "balance": "td.balance"
@@ -147,12 +137,13 @@
     }
   },
   "available_features": {
+    "login": true,
     "search": true,
     "cart_add": true,
     "cart_view": true,
     "cart_delete": true,
     "cart_clear": true,
     "sales_ledger": true,
-    "product_detail": true
+    "pagination": false
   }
 }

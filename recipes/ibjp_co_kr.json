@@ -1,46 +1,46 @@
 {
-  "site_id": "ibjp_co_kr",
+  "site_id": "ibjp_co_kr_auto",
   "site_name": "백제약품",
   "site_url": "https://www.ibjp.co.kr",
   "encoding": "utf-8",
-  "recipe_version": 4,
+  "recipe_version": "2.0",
   "connection": {
-    "request_interval_ms": 500,
-    "ssl_verify": true
+    "base_url": "https://www.ibjp.co.kr",
+    "request_interval_ms": 300
   },
   "login": {
     "method": "POST",
     "url": "/jwt/login",
     "content_type": "application/json",
     "payload": {
-      "loginId": "{username}",
-      "pwd": "{password}",
+      "loginId": "{USERNAME}",
+      "pwd": "{PASSWORD}",
       "companyYn": "N"
+    },
+    "success_indicator": {
+      "type": "json_field",
+      "path": "userData"
     },
     "token": {
       "path": "accessToken",
       "header": "Authorization",
       "prefix": "Bearer ",
       "user_data_path": "userData"
-    },
-    "success_indicator": {
-      "type": "json_field",
-      "path": "accessToken",
-      "value": ""
     }
   },
   "search": {
     "method": "GET",
     "url": "/ord/itemSearch",
+    "response_type": "json",
     "params": {
-      "keyword": "{keyword}",
+      "keyword": "{KEYWORD}",
       "makerNm": "",
       "history": "N",
       "excludingOutOfOtock": "N",
       "custCd": "{CUST_CD}",
-      "custGbCd": "{CUST_GB_CD}",
+      "custGbCd": "01",
       "ordMakerCd": "",
-      "userGbCd": "{USER_GB_CD}",
+      "userGbCd": "30",
       "ing": "N",
       "eff": "N",
       "ingno": "AAAAAAAAAAAAAA",
@@ -52,17 +52,16 @@
       "nonPaymentYn": "N",
       "searchOption": "0"
     },
-    "response_type": "json",
     "json_mapping": {
       "items_path": "",
       "fields": {
         "product_code": "ITEM_CD",
-        "product_name": "ITEM_NM_UNIT",
+        "product_name": "ITEM_NM",
         "manufacturer": "MAKER_NM",
-        "pack_unit": "UNIT",
         "unit_price": "ORD_WP2_AMT",
         "stock_quantity": "AVAIL_STOCK",
         "edi_code": "BOHUM_CD",
+        "pack_unit": "UNIT",
         "insurance_type": "PAY_ITEM_NM"
       }
     }
@@ -73,28 +72,28 @@
     "content_type": "application/json",
     "payload": {
       "basketGbCd": "01",
-      "saveItemCd": "{product_code}",
+      "saveItemCd": "{PRODUCT_CODE}",
       "saveItemGbCd": "01",
       "dlvBrchCd": "{DLV_BRCH_CD}",
-      "saveItemQty": "{quantity}",
+      "saveItemQty": "{QUANTITY}",
       "userId": "{USER_ID}",
       "custCd": "{CUST_CD}"
     },
     "success_indicator": {
       "type": "contains",
-      "value": "정상적으로 처리"
+      "value": "정상적으로 처리되었습니다"
     }
   },
   "cart_view": {
     "method": "GET",
     "url": "/ord/basketList",
+    "response_type": "json",
     "params": {
-      "userGbCd": "{USER_GB_CD}",
+      "userGbCd": "30",
       "custCd": "{CUST_CD}",
       "basketGbCd": "01",
       "gDlvBrchFlag": ""
     },
-    "response_type": "json",
     "json_mapping": {
       "items_path": "",
       "fields": {
@@ -105,14 +104,65 @@
       }
     }
   },
+  "cart_delete": {
+    "method": "DELETE",
+    "url": "/ord/deleteComOrdBasket",
+    "params": {
+      "userId": "{USER_ID}",
+      "custCd": "{CUST_CD}",
+      "itemQty": "",
+      "ordWp2Amt": "",
+      "basketGbCd": "01",
+      "saveItemGbCd": "01",
+      "saveItemCd": "{PRODUCT_CODE}",
+      "dlvBrchCd": "{DLV_BRCH_CD}"
+    },
+    "success_indicator": {
+      "type": "contains",
+      "value": "정상적으로 처리되었습니다"
+    }
+  },
+  "sales_ledger": {
+    "method": "GET",
+    "url": "/pmntItem/listSearch",
+    "response_type": "json",
+    "date_format": "%Y%m%d",
+    "params": {
+      "custCd": "{CUST_CD}",
+      "custNm": "{CUST_NM}",
+      "keyword": "{PRODUCT_FILTER}",
+      "makerNm": "",
+      "orderVal": "0",
+      "startDt": "{START_DATE}",
+      "endDt": "{END_DATE}",
+      "searchAll": "Y",
+      "professionalYn": "N",
+      "generalYn": "N",
+      "paymentYn": "N",
+      "nonPaymentYn": "N",
+      "nonVatYn": "N",
+      "discountYn": "N",
+      "gubunNm": "",
+      "sortType": "Web"
+    },
+    "json_mapping": {
+      "items_path": "list",
+      "fields": {
+        "product_name": "ITEM_NM_UNIT",
+        "transaction_date": "APRV_DT_FM",
+        "quantity": "ITEM_QTY",
+        "sales_amount": "SALE_AMT",
+        "payment": "PAY_AMT",
+        "balance": "BALANCE_A_AMT"
+      }
+    }
+  },
   "available_features": {
-    "login": true,
     "search": true,
     "cart_add": true,
     "cart_view": true,
-    "cart_delete": false,
-    "cart_clear": false,
-    "sales_ledger": false,
-    "pagination": false
+    "cart_delete": true,
+    "cart_clear": true,
+    "sales_ledger": true
   }
 }

@@ -1,5 +1,5 @@
 {
-  "site_id": "wjwp_co_kr_auto",
+  "site_id": "wjwp_co_kr",
   "site_name": "우정약품",
   "site_url": "https://wjwp.co.kr",
   "encoding": "utf-8",
@@ -12,8 +12,8 @@
     "method": "POST",
     "url": "/Common/Certify/Login.asp",
     "payload": {
-      "tx_id": "{USERNAME}",
-      "tx_pw": "{PASSWORD}"
+      "tx_id": "{username}",
+      "tx_pw": "{password}"
     },
     "success_indicator": {
       "type": "cookie",
@@ -26,14 +26,14 @@
     "params": {
       "so": "0",
       "so2": "0",
-      "tx_physic": "{KEYWORD}",
+      "tx_physic": "{keyword}",
       "tx_maker": "",
       "tx_ven": "{VEN_CD}",
       "currVenNm": "{VEN_NM}"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "#frmOrder table.tbl_list tbody tr",
+      "selector": "#frmOrder .wrap_table table tbody tr",
       "fields": {
         "product_code": {
           "selector": "input[name^=pc_]",
@@ -70,22 +70,14 @@
     "url": "/Service/Order/Bag.asp",
     "params": {
       "currVenCd": "{VEN_CD}",
-      "currMkind": "",
-      "currRealVenCd": ""
+      "currMkind": "U"
     },
     "response_type": "html",
     "parsing": {
-      "selector": "tr[id^=bagLine]",
+      "selector": "#bag_view table tbody tr",
       "fields": {
-        "product_code": {
-          "selector": "input[name^=pc_]",
-          "attribute": "value"
-        },
         "product_name": "td:nth-child(2)",
-        "quantity": {
-          "selector": "input[name^=bagQty_]",
-          "attribute": "value"
-        },
+        "quantity": "td:nth-child(3)",
         "total_price": "td:nth-child(4)"
       }
     }
@@ -96,8 +88,7 @@
     "params": {
       "kind": "del",
       "currVenCd": "{VEN_CD}",
-      "currMkind": "",
-      "currRealVenCd": ""
+      "currMkind": "U"
     },
     "success_indicator": {
       "type": "status_code",
@@ -109,25 +100,14 @@
     "url": "/Service/SalesLedger/SalesLedger.asp",
     "date_format": "%Y-%m-%d",
     "params": {
-      "sDate": "{START_DATE}",
-      "eDate": "{END_DATE}",
+      "sDate": "{start_date}",
+      "eDate": "{end_date}",
       "tx_ven": "{VEN_CD}",
       "sv": "{VEN_CD}",
       "currVenNm": "{VEN_NM}",
       "transgu": "0"
     },
-    "response_type": "html",
-    "parsing": {
-      "selector": "table:last-of-type tbody tr",
-      "fields": {
-        "transaction_date": "td:nth-child(2)",
-        "product_name": "td.td_nm",
-        "quantity": "td:nth-child(5)",
-        "unit_price": "td:nth-child(6)",
-        "sales_amount": "td:nth-child(8)",
-        "balance": "td:nth-child(12)"
-      }
-    }
+    "response_type": "html"
   },
   "available_features": {
     "login": true,
