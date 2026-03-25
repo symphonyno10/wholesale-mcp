@@ -69,6 +69,10 @@ logger.info(f"frozen: {getattr(sys, 'frozen', False)}")
 
 mcp = FastMCP("wholesale-tools")
 
+# SQLite DB 초기화
+from .db import WholesaleDB
+_db = WholesaleDB(DATA_DIR / "wholesale.db")
+
 # ── 상태 관리 ──
 _engine = BrowserEngine()
 _executors: dict = {}  # site_id → SiteExecutor
@@ -462,6 +466,12 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
         "pack_units": p.pack_units,
     } for p in products]
 
+    # 약품 마스터 DB에 자동 저장
+    try:
+        _db.upsert_products(items, site_id)
+    except Exception as e:
+        logger.warning(f"약품 DB 저장 실패: {e}")
+
     # 결과가 많으면 파일로 저장하고 요약만 반환
     MAX_INLINE = 20
     if len(items) > MAX_INLINE:
@@ -617,6 +627,12 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
         "sales_amount": e.sales_amount,
         "balance": e.balance,
     } for e in entries]
+
+    # SQLite에 자동 저장 (필터 전 전체 데이터)
+    try:
+        _db.upsert_ledger(items, site_id)
+    except Exception as e:
+        logger.warning(f"DB 저장 실패: {e}")
 
     # 서버 측 후처리 필터 — 사이트가 product_filter를 무시하는 경우 대비
     if product_filter:
@@ -2329,6 +2345,137 @@ def share_recipe(site_id: str) -> str:
         }, ensure_ascii=False, indent=2)
     except Exception as e:
         raise ValueError(f"레시피 제출 실패: {e}")
+
+
+# ═══════════════════════════════════════════
+# 그룹 6: SQLite 매출원장 분석 도구
+# ═══════════════════════════════════════════
+
+@mcp.tool()
+def sync_ledger(site_id: str, period: str = "3m") -> str:
+    """매출원장을 사이트에서 가져와 SQLite DB에 누적 저장.
+
+    중복 데이터는 자동 스킵. 호출할 때마다 새 데이터만 추가됩니다.
+
+    Parameters:
+    - site_id: 사이트 ID 또는 "all" (전체 사이트)
+    - period: 동기화 기간 ("1w", "1m", "3m", "6m", "1y")
+    """
+    if site_id == "all":
+        results = {}
+        for sid in _executors:
+            try:
+                entries = _executors[sid].get_sales_ledger(period=period, detail_mode="0")
+                items = [{"date": e.transaction_date, "product_name": e.product_name,
+                         "pack_unit": e.pack_unit, "quantity": e.quantity,
+                         "unit_price": e.unit_price, "sales_amount": e.sales_amount,
+                         "balance": e.balance, "manufacturer": e.manufacturer,
+                         "edi_code": getattr(e, 'edi_code', '')} for e in entries]
+                results[sid] = _db.upsert_ledger(items, sid)
+            except Exception as e:
+                results[sid] = {"error": str(e)[:80]}
+        return json.dumps(results, ensure_ascii=False, indent=2)
+
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    entries = executor.get_sales_ledger(period=period, detail_mode="0")
+    items = [{"date": e.transaction_date, "product_name": e.product_name,
+             "pack_unit": e.pack_unit, "quantity": e.quantity,
+             "unit_price": e.unit_price, "sales_amount": e.sales_amount,
+             "balance": e.balance, "manufacturer": e.manufacturer,
+             "edi_code": getattr(e, 'edi_code', '')} for e in entries]
+    result = _db.upsert_ledger(items, site_id)
+    return json.dumps(result, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def search_ledger(keyword: str, site_id: str = "all", period: str = "3m",
+                  limit: int = 100) -> str:
+    """SQLite DB에서 약품명으로 매출원장 검색.
+
+    사이트에 접속하지 않고 로컬 DB에서 즉시 검색합니다.
+    DB에 데이터가 없으면 sync_ledger를 먼저 실행하세요.
+
+    Parameters:
+    - keyword: 약품명 검색어
+    - site_id: 사이트 ID 또는 "all"
+    - period: 검색 기간
+    - limit: 최대 반환 건수
+    """
+    rows = _db.search(keyword, site_id, period, limit)
+    return json.dumps({
+        "keyword": keyword,
+        "period": period,
+        "total": len(rows),
+        "entries": rows
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def ledger_summary(site_id: str = "all", period: str = "1m",
+                   top_n: int = 20) -> str:
+    """약품별 주문 합계 (TOP N).
+
+    가장 많이 주문한 약품, 매출액 순위를 확인합니다.
+
+    Parameters:
+    - site_id: 사이트 ID 또는 "all" (전체 도매)
+    - period: 기간
+    - top_n: 상위 몇 개
+    """
+    rows = _db.summary(site_id, period, top_n)
+    return json.dumps({
+        "site_id": site_id,
+        "period": period,
+        "top_n": top_n,
+        "items": rows
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def ledger_compare(keyword: str, period: str = "3m") -> str:
+    """도매별 같은 약품 가격 비교.
+
+    여러 도매에서 같은 약품의 단가, 주문량을 비교합니다.
+
+    Parameters:
+    - keyword: 약품명 검색어
+    - period: 비교 기간
+    """
+    rows = _db.compare(keyword, period)
+    return json.dumps({
+        "keyword": keyword,
+        "period": period,
+        "sites": rows
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def ledger_trend(keyword: str = "", site_id: str = "all",
+                 period: str = "6m") -> str:
+    """월별 주문 추이.
+
+    Parameters:
+    - keyword: 약품명 (빈 값이면 전체)
+    - site_id: 사이트 ID 또는 "all"
+    - period: 기간
+    """
+    rows = _db.trend(keyword, site_id, period)
+    return json.dumps({
+        "keyword": keyword or "(전체)",
+        "site_id": site_id,
+        "period": period,
+        "months": rows
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool()
+def db_stats() -> str:
+    """SQLite DB 현황 — 저장된 매출원장/약품 수, 사이트별 통계."""
+    stats = _db.stats()
+    return json.dumps(stats, ensure_ascii=False, indent=2)
 
 
 # ── 엔트리포인트 ──
