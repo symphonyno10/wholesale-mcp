@@ -21,17 +21,22 @@ from mcp.server.fastmcp import FastMCP
 from .browser_engine import BrowserEngine, SNAPSHOT_JS
 
 PACKAGE_DIR = Path(__file__).resolve().parent          # wholesale_mcp/ (번들 레시피)
-# 데이터 디렉토리: 환경변수 > APPDATA > home > exe 위치 > cwd
+# 데이터 디렉토리: 환경변수 > APPDATA > USERPROFILE > PyInstaller > cwd
+# mcpb의 ${user_config.*}와 ${HOME}은 Windows에서 동작 불안정 (이슈 #52, #217)
+# 서버가 OS API로 직접 경로 결정
 def _resolve_data_dir() -> Path:
     env_dir = os.environ.get("WHOLESALE_MCP_DATA_DIR", "")
-    if env_dir and "${" not in env_dir:
-        return Path(env_dir).resolve()
+    if env_dir and "${" not in env_dir and "%" not in env_dir:
+        p = Path(env_dir)
+        if p.is_absolute():
+            p.mkdir(parents=True, exist_ok=True)
+            return p.resolve()
     appdata = os.environ.get("APPDATA")
     if appdata:
         return Path(appdata) / "wholesale-mcp"
-    home = Path.home()
-    if home != Path("/"):
-        return home / ".wholesale-mcp"
+    userprofile = os.environ.get("USERPROFILE")
+    if userprofile:
+        return Path(userprofile) / "wholesale-mcp-data"
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent / "data"
     return Path.cwd()
@@ -39,9 +44,11 @@ def _resolve_data_dir() -> Path:
 DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
-# 최초 실행 시 번들 레시피를 사용자 폴더에 복사 (.mcpb 설치 후 최초 1회)
-# pip 설치: PACKAGE_DIR/recipes, 소스 실행: PACKAGE_DIR.parent/recipes
+# 최초 실행 시 번들 레시피를 사용자 폴더에 복사
 _bundled_candidates = [PACKAGE_DIR / "recipes", PACKAGE_DIR.parent / "recipes"]
+if getattr(sys, 'frozen', False):
+    import sys as _sys
+    _bundled_candidates.insert(0, Path(_sys._MEIPASS) / "recipes")
 _user_recipes = DATA_DIR / "recipes"
 for _bundled_recipes in _bundled_candidates:
     if _bundled_recipes.exists() and _bundled_recipes.is_dir() and \
@@ -56,6 +63,9 @@ for _bundled_recipes in _bundled_candidates:
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("wholesale-mcp")
+logger.info(f"DATA_DIR: {DATA_DIR}")
+logger.info(f"APPDATA: {os.environ.get('APPDATA', '(없음)')}")
+logger.info(f"frozen: {getattr(sys, 'frozen', False)}")
 
 mcp = FastMCP("wholesale-tools")
 

@@ -13,20 +13,10 @@
     "mcp_config": {
       "command": "${__dirname}/server/wholesale-mcp.exe",
       "args": [],
-      "env": {
-        "WHOLESALE_MCP_DATA_DIR": "${user_config.data_dir}",
-        "PLAYWRIGHT_BROWSERS_PATH": "${__dirname}/server/playwright-browsers"
-      }
+      "env": {}
     }
   },
-  "user_config": {
-    "data_dir": {
-      "type": "directory",
-      "title": "데이터 저장 위치",
-      "description": "아이디/비밀번호, 레시피, 매출원장 데이터가 저장됩니다",
-      "default": []
-    }
-  },
+  "user_config": {},
   "compatibility": {
     "platforms": ["win32"]
   }
