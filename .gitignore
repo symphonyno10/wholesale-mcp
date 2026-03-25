@@ -69,3 +69,5 @@ recipes_backup*/
 # 빌드 산출물
 *.spec
 *.db
+*.html
+/installer/
