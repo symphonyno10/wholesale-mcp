@@ -3,16 +3,13 @@ import sys
 from pathlib import Path
 
 if getattr(sys, 'frozen', False):
-    base_dir = Path(sys._MEIPASS)
+    # PyInstaller: frozen importer가 wholesale_mcp 패키지 처리
+    pass
 else:
-    base_dir = Path(__file__).resolve().parent
-
-# src/ 경로 추가
-src_dir = base_dir / "src"
-if src_dir.is_dir():
-    sys.path.insert(0, str(src_dir))
-else:
-    sys.path.insert(0, str(base_dir))
+    # 개발 모드: src/ 디렉토리를 sys.path에 추가
+    src_dir = Path(__file__).resolve().parent / "src"
+    if src_dir.is_dir():
+        sys.path.insert(0, str(src_dir))
 
 from wholesale_mcp.server import main
 
