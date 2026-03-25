@@ -61,3 +61,11 @@ recipes/*_auto.json
 *_auto.json
 data/
 recipes_backup*/
+
+# 구버전 폴더 (루트만, src/ 제외)
+/wholesale_mcp/
+/recipes.example/
+
+# 빌드 산출물
+*.spec
+*.db

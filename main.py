@@ -1,15 +1,18 @@
-"""PyInstaller entry point — avoids relative import issues."""
+"""wholesale-mcp 진입점 — .mcp.json + PyInstaller 공용"""
 import sys
 import os
 
-# Ensure wholesale_mcp package is importable
 if getattr(sys, 'frozen', False):
-    # Running as PyInstaller bundle
     base_dir = sys._MEIPASS
 else:
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
-sys.path.insert(0, base_dir)
+# src/ 경로 추가
+src_dir = os.path.join(base_dir, "src")
+if os.path.isdir(src_dir):
+    sys.path.insert(0, src_dir)
+else:
+    sys.path.insert(0, base_dir)
 
 from wholesale_mcp.server import main
 

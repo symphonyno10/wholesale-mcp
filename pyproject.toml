@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wholesale-mcp"
-version = "1.5.3"
+version = "1.6.0"
 description = "MCP server for wholesale pharmacy site automation - login, search, cart, sales ledger"
 readme = "README.md"
 license = {text = "MIT"}
@@ -35,7 +35,11 @@ Repository = "https://github.com/symphonyno10/wholesale-mcp"
 wholesale-mcp = "wholesale_mcp.server:main"
 
 [tool.setuptools.packages.find]
+where = ["src"]
 include = ["wholesale_mcp*"]
 
 [tool.setuptools.package-data]
-"wholesale_mcp" = ["recipes/*.json"]
+"wholesale_mcp" = ["*.json"]
+
+[tool.setuptools.data-files]
+"share/wholesale-mcp/recipes" = ["recipes/*.json"]
