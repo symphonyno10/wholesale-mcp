@@ -29,6 +29,13 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
+      - name: Install Playwright Chromium
+        run: |
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$pwd\playwright-browsers"
+          python -m playwright install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\playwright-browsers
+
       - name: Build .exe with PyInstaller
         run: |
           pyinstaller main.py --onefile --name wholesale-mcp `
@@ -45,7 +52,9 @@ jobs:
             --hidden-import mcp.server.fastmcp `
             --collect-all pydantic `
             --collect-all uvicorn `
-            --add-data "recipes;recipes"
+            --collect-all playwright `
+            --add-data "recipes;recipes" `
+            --add-data "playwright-browsers;playwright-browsers"
 
       - name: Sync manifest version
         run: |
