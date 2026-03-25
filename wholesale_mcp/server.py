@@ -12,6 +12,7 @@ AI 코딩 어시스턴트(Claude Code, Cursor 등)에서 MCP 연결하여
 """
 import json
 import os
+import sys
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
@@ -39,15 +40,19 @@ DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # 최초 실행 시 번들 레시피를 사용자 폴더에 복사 (.mcpb 설치 후 최초 1회)
-_bundled_recipes = PACKAGE_DIR.parent / "recipes"
+# pip 설치: PACKAGE_DIR/recipes, 소스 실행: PACKAGE_DIR.parent/recipes
+_bundled_candidates = [PACKAGE_DIR / "recipes", PACKAGE_DIR.parent / "recipes"]
 _user_recipes = DATA_DIR / "recipes"
-if _bundled_recipes.exists() and _bundled_recipes.is_dir():
-    _user_recipes.mkdir(exist_ok=True)
-    import shutil
-    for src in _bundled_recipes.glob("*.json"):
-        dst = _user_recipes / src.name
-        if not dst.exists():
-            shutil.copy2(src, dst)
+for _bundled_recipes in _bundled_candidates:
+    if _bundled_recipes.exists() and _bundled_recipes.is_dir() and \
+       _bundled_recipes.resolve() != _user_recipes.resolve():
+        _user_recipes.mkdir(exist_ok=True)
+        import shutil
+        for src in _bundled_recipes.glob("*.json"):
+            dst = _user_recipes / src.name
+            if not dst.exists():
+                shutil.copy2(src, dst)
+        break
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("wholesale-mcp")
@@ -180,9 +185,14 @@ async def screenshot() -> str:
     output_dir = DATA_DIR / "screenshots"
     output_dir.mkdir(exist_ok=True)
     fname = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
-    path = str(output_dir / fname)
-    await _engine.screenshot(path)
-    return json.dumps({"path": path}, ensure_ascii=False, indent=2)
+    fpath = output_dir / fname
+    await _engine.screenshot(str(fpath))
+    rel_path = str(fpath.relative_to(DATA_DIR))
+    return json.dumps({
+        "path": rel_path,
+        "absolute_path": str(fpath),
+        "how_to_read": f"read_data_file('{rel_path}')로 읽을 수 있습니다."
+    }, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -367,7 +377,11 @@ def list_sites() -> str:
             "has_credentials": sid in creds,
             "logged_in": sid in _executors and _executors[sid].is_authenticated(),
         })
-    return json.dumps(sites, ensure_ascii=False, indent=2)
+    return json.dumps({
+        "data_dir": str(DATA_DIR),
+        "sites": sites,
+        "file_tools": "list_data_files(), read_data_file(), write_data_file(), export_ledger_csv() 사용 가능"
+    }, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
@@ -445,11 +459,13 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
         data_dir.mkdir(exist_ok=True)
         fpath = data_dir / f"search_{site_id}_{keyword}.json"
         fpath.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        rel_path = str(fpath.relative_to(DATA_DIR))
         return json.dumps({
             "total": len(items),
-            "saved_to": str(fpath),
+            "saved_to": rel_path,
             "sample": items[:5],
-            "message": f"결과 {len(items)}건. 상위 5건만 표시. 전체는 {fpath} 파일 참조."
+            "message": f"결과 {len(items)}건. 상위 5건만 표시.",
+            "how_to_read": f"read_data_file('{rel_path}')로 전체 데이터를 읽으세요."
         }, ensure_ascii=False, indent=2)
 
     return json.dumps(items, ensure_ascii=False, indent=2)
@@ -605,15 +621,17 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
         data_dir.mkdir(exist_ok=True)
         fpath = data_dir / f"ledger_{site_id}.json"
         fpath.write_text(json.dumps(items, ensure_ascii=False, indent=2), encoding="utf-8")
+        rel_path = str(fpath.relative_to(DATA_DIR))
         return json.dumps({
             "site_id": site_id,
             "period": f"{start_date or '(auto)'} ~ {end_date or '(today)'}",
             "detail_mode": "약품별 상세" if detail else "일자별 요약",
             "total_entries": len(items),
             "total_amount": total_amount,
-            "saved_to": str(fpath),
+            "saved_to": rel_path,
             "sample": items[:5],
-            "message": f"매출원장 {len(items)}건 (합계 {total_amount:,.0f}원). 상위 5건만 표시. 전체는 {fpath} 파일 참조."
+            "message": f"매출원장 {len(items)}건 (합계 {total_amount:,.0f}원). 상위 5건만 표시.",
+            "how_to_read": f"read_data_file('{rel_path}')로 전체 데이터를 읽으세요. CSV 내보내기: export_ledger_csv('{site_id}')"
         }, ensure_ascii=False, indent=2)
 
     return json.dumps({
@@ -1318,42 +1336,156 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
         raise ValueError(f"저장 실패: {e}")
 
 
-@mcp.tool()
-def read_project_file(file_path: str, offset: int = 0, limit: int = 200,
-                      keyword: str = "") -> str:
-    """데이터 파일 읽기 (매출원장 JSON, 레시피 등).
+# ═══════════════════════════════════════════
+# 그룹 5: 파일 관리 도구 (MCP Filesystem 패턴 준수)
+#
+# 공식 레퍼런스: @modelcontextprotocol/server-filesystem
+# - 파일 접근은 Tools로 제공 (Resources 아님)
+# - allowed_directories 기반 샌드박스
+# - 심링크/null byte 방어, 원자적 쓰기
+# - Tool Annotations로 읽기/쓰기/위험도 명시
+# ═══════════════════════════════════════════
 
-    Parameters:
-    - file_path: 파일 경로 (상대 또는 절대)
-    - offset: 건너뛸 항목 수 (JSON 배열인 경우)
-    - limit: 반환할 최대 항목 수 (기본 200)
-    - keyword: 약품명 검색 필터 (JSON 배열의 product_name 필드에서 검색)
+# ── 경로 검증 (path-validation 모듈 상당) ──
 
-    보안: 데이터 디렉토리 내부 파일만 접근 가능.
+def _validate_path(file_path: str, must_exist: bool = True) -> Path:
+    """MCP filesystem 패턴 준수 경로 검증.
+
+    보안 체크:
+    1. null byte 차단
+    2. 경로 정규화 (normalize + resolve)
+    3. allowed directory (DATA_DIR) 내부 확인
+    4. 심링크 실제 경로 확인
     """
-    project_root = DATA_DIR.resolve()
+    # null byte 차단
+    if '\x00' in file_path:
+        raise ValueError("경로에 null byte를 포함할 수 없습니다.")
 
-    # 상대경로 → DATA_DIR 기준으로 resolve
+    data_root = DATA_DIR.resolve()
     p = Path(file_path)
     if p.is_absolute():
         target = p.resolve()
     else:
         target = (DATA_DIR / file_path).resolve()
 
-    # 보안: 데이터 디렉토리 내부만 허용
+    # 샌드박스 경계 확인
     try:
-        target.relative_to(project_root)
+        target.relative_to(data_root)
     except ValueError:
-        raise ValueError(f"데이터 디렉토리 외부 파일은 읽을 수 없습니다: {file_path}")
+        raise ValueError(
+            f"허용된 디렉토리 외부 접근 거부: {file_path}\n"
+            f"허용 디렉토리: {data_root}"
+        )
 
-    if not target.exists():
-        raise ValueError(f"파일이 없습니다: {file_path}")
+    if must_exist:
+        if not target.exists():
+            raise ValueError(
+                f"파일이 없습니다: {file_path}\n"
+                f"list_data_files()로 사용 가능한 파일을 확인하세요."
+            )
+        # 심링크 실제 경로 확인
+        real_path = target.resolve(strict=True)
+        try:
+            real_path.relative_to(data_root)
+        except ValueError:
+            raise ValueError(f"접근 거부 — 심링크 대상이 허용 디렉토리 외부: {file_path}")
+    else:
+        # 새 파일: 부모 디렉토리 검증
+        parent = target.parent
+        if parent.exists():
+            real_parent = parent.resolve(strict=True)
+            try:
+                real_parent.relative_to(data_root)
+            except ValueError:
+                raise ValueError(f"접근 거부 — 부모 디렉토리가 허용 범위 외부: {file_path}")
+
+    return target
+
+
+def _atomic_write(target: Path, content: str, encoding: str = 'utf-8') -> None:
+    """원자적 파일 쓰기 (TOCTOU 방지).
+
+    공식 filesystem 서버 패턴: 임시파일 → atomic rename.
+    """
+    import tempfile
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    # 같은 디렉토리에 임시파일 → rename (크로스 파일시스템 방지)
+    fd, tmp_path = tempfile.mkstemp(
+        dir=str(target.parent),
+        prefix=f".{target.stem}_",
+        suffix=".tmp"
+    )
+    try:
+        with os.fdopen(fd, 'w', encoding=encoding) as f:
+            f.write(content)
+        os.replace(tmp_path, str(target))  # atomic on POSIX
+    except Exception:
+        # 실패 시 임시파일 정리
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
+
+
+# ── 민감 파일 보호 목록 ──
+_PROTECTED_FILES = {"credentials.json"}
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "title": "허용된 디렉토리 목록"})
+def list_allowed_directories() -> str:
+    """이 MCP 서버가 접근할 수 있는 디렉토리를 표시합니다.
+
+    모든 파일 도구(read/write/list)는 이 디렉토리 내부에서만 작동합니다.
+    AI 클라이언트의 자체 파일 도구(Read, Write 등)로는 이 디렉토리에 접근할 수 없으므로,
+    반드시 MCP 서버의 파일 도구를 사용해야 합니다.
+    """
+    data_root = DATA_DIR.resolve()
+    subdirs = []
+    for d in sorted(data_root.iterdir()):
+        if d.is_dir():
+            subdirs.append(str(d.relative_to(data_root)))
+
+    return json.dumps({
+        "allowed_directories": [str(data_root)],
+        "data_dir": str(data_root),
+        "subdirectories": subdirs,
+        "available_tools": {
+            "read": ["read_data_file", "get_file_info"],
+            "write": ["write_data_file", "export_ledger_csv"],
+            "list": ["list_data_files", "search_data_files"],
+            "meta": ["list_allowed_directories"],
+        },
+        "note": "AI 클라이언트의 자체 파일 도구(Read/Write)로는 이 디렉토리에 접근 불가. 반드시 위 MCP 도구를 사용하세요."
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "title": "데이터 파일 읽기"})
+def read_data_file(file_path: str, offset: int = 0, limit: int = 200,
+                   keyword: str = "", head: int = 0, tail: int = 0) -> str:
+    """데이터 파일 읽기 (매출원장 JSON, 레시피, CSV 등).
+
+    이 도구는 MCP 서버의 데이터 디렉토리 내 파일을 읽습니다.
+    AI 클라이언트의 자체 파일 도구로는 이 파일들에 접근할 수 없으므로,
+    반드시 이 도구를 사용하세요.
+
+    Parameters:
+    - file_path: 파일 경로 (상대경로 권장: "data/ledger_site.json")
+    - offset: 건너뛸 항목 수 (JSON 배열인 경우)
+    - limit: 반환할 최대 항목 수 (기본 200)
+    - keyword: 검색 필터 (JSON 배열의 모든 필드에서 검색)
+    - head: 첫 N줄만 반환 (텍스트/CSV, 0=전체)
+    - tail: 마지막 N줄만 반환 (텍스트/CSV, 0=전체)
+
+    사용 가능한 파일 목록은 list_data_files()로 확인하세요.
+    """
+    target = _validate_path(file_path)
 
     # JSON 파일이면 항목별 검색/페이징 지원
     if target.suffix == '.json':
         data = json.loads(target.read_text(encoding='utf-8'))
         if isinstance(data, list):
-            # 키워드 필터
             if keyword:
                 data = [item for item in data
                         if keyword.lower() in json.dumps(item, ensure_ascii=False).lower()]
@@ -1365,14 +1497,276 @@ def read_project_file(file_path: str, offset: int = 0, limit: int = 200,
                 "limit": limit,
                 "keyword": keyword,
                 "count": len(sliced),
-                "items": sliced
+                "items": sliced,
+                "data_dir": str(DATA_DIR),
             }, ensure_ascii=False, indent=2)
+        # dict 등 다른 JSON은 그대로 반환
+        return json.dumps(data, ensure_ascii=False, indent=2)
 
-    # 일반 텍스트
+    # 텍스트/CSV 파일
     text = target.read_text(encoding='utf-8')
+    if head > 0:
+        lines = text.splitlines(keepends=True)
+        text = ''.join(lines[:head])
+    elif tail > 0:
+        lines = text.splitlines(keepends=True)
+        text = ''.join(lines[-tail:])
+
     if len(text) > 500_000:
         return text[:500_000] + f"\n\n... (파일 크기 {len(text):,} bytes, 500KB까지 표시)"
     return text
+
+
+# 하위 호환: read_project_file → read_data_file 별칭
+@mcp.tool(annotations={"readOnlyHint": True, "title": "[별칭] 데이터 파일 읽기"})
+def read_project_file(file_path: str, offset: int = 0, limit: int = 200,
+                      keyword: str = "") -> str:
+    """[별칭] read_data_file과 동일. 데이터 파일 읽기."""
+    return read_data_file(file_path, offset, limit, keyword)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "title": "파일 정보 조회"})
+def get_file_info(file_path: str) -> str:
+    """파일 메타데이터 조회 (크기, 수정일, 타입).
+
+    Parameters:
+    - file_path: 파일 경로 (상대 또는 절대)
+    """
+    target = _validate_path(file_path)
+    stat = target.stat()
+    return json.dumps({
+        "path": str(target.relative_to(DATA_DIR)),
+        "absolute_path": str(target),
+        "size": stat.st_size,
+        "size_human": f"{stat.st_size:,} bytes" if stat.st_size < 1024*1024
+                      else f"{stat.st_size/1024/1024:.1f} MB",
+        "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
+        "created": datetime.fromtimestamp(stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S"),
+        "is_symlink": target.is_symlink(),
+        "suffix": target.suffix,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "title": "파일 목록 조회"})
+def list_data_files(subdirectory: str = "") -> str:
+    """데이터 디렉토리의 파일 목록 조회.
+
+    AI 클라이언트가 접근 가능한 파일 목록을 확인합니다.
+    saved_to로 반환된 파일 경로를 찾을 때 유용합니다.
+
+    Parameters:
+    - subdirectory: 하위 디렉토리 (예: "data", "recipes", "screenshots"). 비어있으면 전체.
+    """
+    if subdirectory:
+        target_dir = _validate_path(subdirectory)
+        if not target_dir.is_dir():
+            raise ValueError(f"디렉토리가 아닙니다: {subdirectory}")
+    else:
+        target_dir = DATA_DIR
+
+    if not target_dir.exists():
+        return json.dumps({
+            "data_dir": str(DATA_DIR),
+            "subdirectory": subdirectory,
+            "files": [],
+            "message": "디렉토리가 비어있거나 존재하지 않습니다."
+        }, ensure_ascii=False, indent=2)
+
+    files = []
+    for f in sorted(target_dir.rglob("*")):
+        if f.is_file():
+            rel = f.relative_to(DATA_DIR)
+            stat = f.stat()
+            files.append({
+                "path": str(rel),
+                "size": stat.st_size,
+                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+            })
+
+    return json.dumps({
+        "data_dir": str(DATA_DIR),
+        "subdirectory": subdirectory or "(전체)",
+        "total_files": len(files),
+        "files": files,
+        "usage": "read_data_file('경로')로 파일 내용을 읽으세요."
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool(annotations={"readOnlyHint": True, "title": "파일 검색"})
+def search_data_files(pattern: str = "*.json", keyword: str = "") -> str:
+    """데이터 디렉토리 내 파일 검색 (glob 패턴 + 내용 검색).
+
+    Parameters:
+    - pattern: glob 패턴 (예: "*.json", "data/ledger_*.csv", "**/*.json")
+    - keyword: 파일 내용에서 검색할 키워드 (선택)
+    """
+    data_root = DATA_DIR.resolve()
+    matches = []
+
+    for f in sorted(data_root.rglob(pattern)):
+        if not f.is_file():
+            continue
+        # 심링크 체크
+        try:
+            f.resolve(strict=True).relative_to(data_root)
+        except (ValueError, OSError):
+            continue
+
+        rel = str(f.relative_to(data_root))
+        stat = f.stat()
+        entry = {
+            "path": rel,
+            "size": stat.st_size,
+            "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+        }
+
+        if keyword:
+            try:
+                content = f.read_text(encoding='utf-8', errors='ignore')
+                if keyword.lower() not in content.lower():
+                    continue
+                # 매칭 라인 미리보기
+                for line in content.splitlines():
+                    if keyword.lower() in line.lower():
+                        entry["match_preview"] = line.strip()[:200]
+                        break
+            except Exception:
+                continue
+
+        matches.append(entry)
+        if len(matches) >= 100:
+            break
+
+    return json.dumps({
+        "pattern": pattern,
+        "keyword": keyword,
+        "total_matches": len(matches),
+        "files": matches,
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool(annotations={
+    "readOnlyHint": False, "destructiveHint": True, "idempotentHint": True,
+    "title": "데이터 파일 쓰기"
+})
+def write_data_file(file_path: str, content: str, format: str = "auto") -> str:
+    """데이터 파일 쓰기/내보내기 (CSV, JSON, 텍스트).
+
+    매출원장 데이터를 CSV로 변환하거나, 분석 결과를 저장할 때 사용합니다.
+    AI 클라이언트의 자체 파일 도구로는 데이터 디렉토리에 쓸 수 없으므로,
+    반드시 이 도구를 사용하세요.
+
+    Parameters:
+    - file_path: 상대 경로 (예: "data/analysis.csv", "data/report.json")
+    - content: 파일 내용 (텍스트/CSV/JSON 문자열)
+    - format: "auto"(확장자 추론), "csv", "json", "text"
+
+    보안: 데이터 디렉토리 내부에만 쓸 수 있습니다. credentials.json 수정 불가.
+    """
+    target = _validate_path(file_path, must_exist=False)
+
+    # 민감 파일 보호
+    if target.name in _PROTECTED_FILES:
+        raise ValueError(f"{target.name}은(는) 이 도구로 수정할 수 없습니다. register_site()를 사용하세요.")
+
+    # JSON 포맷 정규화
+    if format == "json" or (format == "auto" and target.suffix == '.json'):
+        try:
+            parsed = json.loads(content)
+            content = json.dumps(parsed, ensure_ascii=False, indent=2)
+        except json.JSONDecodeError:
+            pass
+
+    # 원자적 쓰기
+    _atomic_write(target, content)
+    rel_path = target.relative_to(DATA_DIR.resolve())
+
+    return json.dumps({
+        "success": True,
+        "file_path": str(rel_path),
+        "absolute_path": str(target),
+        "size": target.stat().st_size,
+        "message": f"파일 저장 완료. read_data_file('{rel_path}')로 읽을 수 있습니다."
+    }, ensure_ascii=False, indent=2)
+
+
+@mcp.tool(annotations={
+    "readOnlyHint": False, "destructiveHint": False, "idempotentHint": True,
+    "title": "매출원장 CSV 내보내기"
+})
+def export_ledger_csv(site_id: str, start_date: str = "", end_date: str = "",
+                      period: str = "3m", product_filter: str = "") -> str:
+    """매출원장 데이터를 CSV 파일로 내보내기.
+
+    대량 데이터 분석/통계에 적합합니다. 결과를 CSV+JSON으로 저장하고 경로를 반환합니다.
+
+    Parameters:
+    - site_id: 사이트 ID
+    - start_date, end_date: 날짜 범위 (YYYY-MM-DD)
+    - period: 상대 기간 ("1w", "1m", "3m", "6m", "1y")
+    - product_filter: 약품명 필터
+    """
+    import csv
+    import io
+
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: {site_id}")
+
+    entries = executor.get_sales_ledger(
+        start_date=start_date, end_date=end_date,
+        period=period, detail_mode="0",
+        product_filter=product_filter
+    )
+
+    items = [{
+        "date": e.transaction_date,
+        "product_name": e.product_name,
+        "pack_unit": e.pack_unit,
+        "quantity": e.quantity,
+        "unit_price": e.unit_price,
+        "sales_amount": e.sales_amount,
+        "balance": e.balance,
+    } for e in entries]
+
+    if product_filter:
+        items = [i for i in items if product_filter.lower() in (i.get('product_name', '') or '').lower()]
+
+    if not items:
+        return json.dumps({"error": "데이터 없음", "site_id": site_id}, ensure_ascii=False)
+
+    # CSV 생성
+    output = io.StringIO()
+    fieldnames = ["date", "product_name", "pack_unit",
+                  "quantity", "unit_price", "sales_amount", "balance"]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(items)
+    csv_content = output.getvalue()
+
+    # 원자적 쓰기
+    data_dir = DATA_DIR / "data"
+    data_dir.mkdir(exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d")
+    csv_path = data_dir / f"ledger_{site_id}_{timestamp}.csv"
+    _atomic_write(csv_path, csv_content, encoding='utf-8-sig')  # BOM for Excel
+
+    json_path = data_dir / f"ledger_{site_id}.json"
+    _atomic_write(json_path, json.dumps(items, ensure_ascii=False, indent=2))
+
+    total_amount = sum(i.get('sales_amount', 0) or 0 for i in items)
+
+    return json.dumps({
+        "success": True,
+        "site_id": site_id,
+        "total_entries": len(items),
+        "total_amount": total_amount,
+        "csv_file": str(csv_path.relative_to(DATA_DIR)),
+        "json_file": str(json_path.relative_to(DATA_DIR)),
+        "message": f"매출원장 {len(items)}건 CSV/JSON 저장 완료. "
+                   f"read_data_file('{csv_path.relative_to(DATA_DIR)}')로 읽을 수 있습니다.",
+        "sample": items[:5],
+    }, ensure_ascii=False, indent=2)
 
 
 @mcp.tool()
