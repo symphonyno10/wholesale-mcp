@@ -633,8 +633,11 @@ class SiteExecutor:
 
     def _parse_price(self, price_str: str) -> float:
         try:
-            cleaned = re.sub(r'[^\d.]', '', str(price_str))
-            return float(cleaned) if cleaned else 0.0
+            s = str(price_str).strip()
+            neg = s.startswith('-')
+            cleaned = re.sub(r'[^\d.]', '', s)
+            val = float(cleaned) if cleaned else 0.0
+            return -val if neg else val
         except ValueError:
             return 0.0
 
@@ -652,8 +655,11 @@ class SiteExecutor:
 
     def _parse_int(self, value: str) -> int:
         try:
-            cleaned = re.sub(r'[^\d]', '', str(value))
-            return int(cleaned) if cleaned else 0
+            s = str(value).strip()
+            neg = s.startswith('-')
+            cleaned = re.sub(r'[^\d]', '', s)
+            val = int(cleaned) if cleaned else 0
+            return -val if neg else val
         except (ValueError, TypeError):
             return 0
 
