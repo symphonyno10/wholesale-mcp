@@ -167,32 +167,49 @@ auto_login_all()
 
 ## 파일 접근 규칙 (중요!)
 
-### MCP 데이터 디렉토리
+> **MCP 공식 패턴 준수**: `@modelcontextprotocol/server-filesystem` 레퍼런스 서버의
+> 아키텍처를 따릅니다. 파일 접근은 Resources가 아닌 Tools로 제공하며,
+> allowed_directories 기반 샌드박스 + 심링크/null byte 방어 + 원자적 쓰기를 적용합니다.
+
+### MCP 데이터 디렉토리 (Allowed Directory)
 
 모든 데이터 파일(레시피, 크레덴셜, 매출원장, 검색결과 등)은 **DATA_DIR**에 저장됩니다.
 DATA_DIR 위치: `~/.wholesale-mcp` (Linux/Mac) 또는 `%APPDATA%/wholesale-mcp` (Windows)
 
 **AI 클라이언트(Claude Desktop, Cursor 등)의 자체 파일 도구(Read, Write 등)로는
 MCP 서버의 DATA_DIR에 접근할 수 없습니다.**
-반드시 MCP 서버가 제공하는 파일 도구를 사용해야 합니다:
+반드시 MCP 서버가 제공하는 파일 도구를 사용해야 합니다.
 
 ### 파일 관리 도구
 
-| 도구 | 용도 |
-|------|------|
-| `list_data_files(subdirectory)` | 파일 목록 조회 ("data", "recipes" 등) |
-| `read_data_file(path, offset, limit, keyword)` | 파일 읽기 (JSON 페이징/검색 지원) |
-| `write_data_file(path, content, format)` | 파일 쓰기 (CSV, JSON, 텍스트) |
-| `export_ledger_csv(site_id, period)` | 매출원장 CSV 내보내기 |
+| 도구 | 타입 | Annotation | 용도 |
+|------|------|------------|------|
+| `list_allowed_directories()` | 메타 | readOnly | 접근 가능한 디렉토리 + 사용 가능 도구 목록 |
+| `list_data_files(subdirectory)` | 읽기 | readOnly | 파일 목록 조회 ("data", "recipes" 등) |
+| `read_data_file(path, offset, limit, keyword, head, tail)` | 읽기 | readOnly | 파일 읽기 (JSON 페이징/검색, head/tail 지원) |
+| `get_file_info(path)` | 읽기 | readOnly | 파일 메타데이터 (크기, 수정일, 심링크 여부) |
+| `search_data_files(pattern, keyword)` | 읽기 | readOnly | glob 패턴 + 내용 검색 |
+| `write_data_file(path, content, format)` | 쓰기 | destructive | 파일 쓰기 (원자적 쓰기, CSV/JSON/텍스트) |
+| `export_ledger_csv(site_id, period)` | 쓰기 | idempotent | 매출원장 CSV+JSON 내보내기 |
+
+### 보안 모델
+
+1. **샌드박스**: 모든 파일 도구는 DATA_DIR 내부에서만 작동
+2. **null byte 차단**: 경로에 `\x00` 포함 시 거부
+3. **심링크 방어**: 심링크 대상이 DATA_DIR 외부이면 거부
+4. **원자적 쓰기**: 임시파일 → `os.replace()` (TOCTOU 방지)
+5. **민감 파일 보호**: `credentials.json` 직접 수정 차단
 
 ### 대량 데이터 처리 워크플로우
 
 매출원장 통계/그래프 작업 시:
 ```
-1. export_ledger_csv(site_id, period="1y") → CSV 파일 자동 저장
-2. read_data_file("data/ledger_site.json", keyword="타이레놀") → 필터링 조회
-3. write_data_file("data/analysis.csv", csv_content) → 분석 결과 저장
-4. list_data_files("data") → 저장된 파일 확인
+1. list_allowed_directories() → 접근 가능한 디렉토리 + 도구 확인
+2. export_ledger_csv(site_id, period="1y") → CSV+JSON 파일 원자적 저장
+3. read_data_file("data/ledger_site.json", keyword="타이레놀") → 필터링 조회
+4. search_data_files("data/ledger_*.csv") → 기존 데이터 파일 검색
+5. write_data_file("data/analysis.csv", csv_content) → 분석 결과 원자적 저장
+6. get_file_info("data/analysis.csv") → 저장 결과 확인
 ```
 
 **주의**: `saved_to` 응답에 포함된 경로는 DATA_DIR 기준 상대경로입니다.
