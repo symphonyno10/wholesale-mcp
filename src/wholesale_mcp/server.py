@@ -883,7 +883,7 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
     # ── recipe_draft: 검증된 셀렉터를 도구가 직접 생성 ──
     recipe_draft = {}
     try:
-        recipe_draft = await page.evaluate("""() => {
+        recipe_draft = await page.evaluate(r"""() => {
             const draft = {};
 
             // 1. 검색 결과 테이블 → row_selector + fields 자동 추출

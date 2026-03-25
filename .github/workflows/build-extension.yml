@@ -31,7 +31,21 @@ jobs:
 
       - name: Build .exe with PyInstaller
         run: |
-          pyinstaller main.py --onefile --name wholesale-mcp --hidden-import wholesale_mcp --hidden-import wholesale_mcp.server --hidden-import wholesale_mcp.site_executor --hidden-import wholesale_mcp.browser_engine --hidden-import wholesale_mcp.recipe_normalizer --hidden-import wholesale_mcp.recipe_schema --hidden-import wholesale_mcp.db --add-data "recipes;recipes" --paths src
+          pyinstaller main.py --onefile --name wholesale-mcp `
+            --paths src `
+            --hidden-import wholesale_mcp `
+            --hidden-import wholesale_mcp.server `
+            --hidden-import wholesale_mcp.site_executor `
+            --hidden-import wholesale_mcp.browser_engine `
+            --hidden-import wholesale_mcp.recipe_normalizer `
+            --hidden-import wholesale_mcp.recipe_schema `
+            --hidden-import wholesale_mcp.db `
+            --hidden-import mcp `
+            --hidden-import mcp.server `
+            --hidden-import mcp.server.fastmcp `
+            --collect-all pydantic `
+            --collect-all uvicorn `
+            --add-data "recipes;recipes"
 
       - name: Sync manifest version
         run: |
