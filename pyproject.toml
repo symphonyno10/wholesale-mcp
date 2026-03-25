@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "wholesale-mcp"
-version = "1.6.2"
+version = "1.6.3"
 description = "MCP server for wholesale pharmacy site automation - login, search, cart, sales ledger"
 readme = "README.md"
 license = {text = "MIT"}

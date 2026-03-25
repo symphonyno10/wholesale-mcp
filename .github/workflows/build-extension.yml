@@ -42,18 +42,19 @@ jobs:
 
       - name: Pack .mcpb
         run: |
-          npx @anthropic-ai/mcpb pack dist/extension wholesale-mcp.mcpb
+          $version = "${{ github.ref_name }}"
+          npx @anthropic-ai/mcpb pack dist/extension "wholesale-mcp-${version}.mcpb"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: wholesale-mcp-windows
-          path: wholesale-mcp.mcpb
+          path: wholesale-mcp-${{ github.ref_name }}.mcpb
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: wholesale-mcp.mcpb
+          files: wholesale-mcp-${{ github.ref_name }}.mcpb
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
