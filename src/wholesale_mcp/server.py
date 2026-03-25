@@ -37,6 +37,10 @@ def _resolve_data_dir() -> Path:
     userprofile = os.environ.get("USERPROFILE")
     if userprofile:
         return Path(userprofile) / "wholesale-mcp-data"
+    # Mac/Linux: ~/.wholesale-mcp
+    home = Path.home()
+    if home != Path("/"):
+        return home / ".wholesale-mcp"
     if getattr(sys, 'frozen', False):
         return Path(sys.executable).parent / "data"
     return Path.cwd()
@@ -1445,7 +1449,7 @@ def _atomic_write(target: Path, content: str, encoding: str = 'utf-8') -> None:
     try:
         with os.fdopen(fd, 'w', encoding=encoding) as f:
             f.write(content)
-        os.replace(tmp_path, str(target))  # atomic on POSIX
+        os.replace(tmp_path, str(target))  # atomic on POSIX and Windows
     except Exception:
         # 실패 시 임시파일 정리
         try:
