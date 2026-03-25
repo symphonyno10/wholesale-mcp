@@ -165,6 +165,39 @@ auto_login_all()
 5. recipe_sales_ledger(site_id, period="3m") → 매출원장 조회
 ```
 
+## 파일 접근 규칙 (중요!)
+
+### MCP 데이터 디렉토리
+
+모든 데이터 파일(레시피, 크레덴셜, 매출원장, 검색결과 등)은 **DATA_DIR**에 저장됩니다.
+DATA_DIR 위치: `~/.wholesale-mcp` (Linux/Mac) 또는 `%APPDATA%/wholesale-mcp` (Windows)
+
+**AI 클라이언트(Claude Desktop, Cursor 등)의 자체 파일 도구(Read, Write 등)로는
+MCP 서버의 DATA_DIR에 접근할 수 없습니다.**
+반드시 MCP 서버가 제공하는 파일 도구를 사용해야 합니다:
+
+### 파일 관리 도구
+
+| 도구 | 용도 |
+|------|------|
+| `list_data_files(subdirectory)` | 파일 목록 조회 ("data", "recipes" 등) |
+| `read_data_file(path, offset, limit, keyword)` | 파일 읽기 (JSON 페이징/검색 지원) |
+| `write_data_file(path, content, format)` | 파일 쓰기 (CSV, JSON, 텍스트) |
+| `export_ledger_csv(site_id, period)` | 매출원장 CSV 내보내기 |
+
+### 대량 데이터 처리 워크플로우
+
+매출원장 통계/그래프 작업 시:
+```
+1. export_ledger_csv(site_id, period="1y") → CSV 파일 자동 저장
+2. read_data_file("data/ledger_site.json", keyword="타이레놀") → 필터링 조회
+3. write_data_file("data/analysis.csv", csv_content) → 분석 결과 저장
+4. list_data_files("data") → 저장된 파일 확인
+```
+
+**주의**: `saved_to` 응답에 포함된 경로는 DATA_DIR 기준 상대경로입니다.
+`read_data_file('data/ledger_site.json')`처럼 그대로 사용하면 됩니다.
+
 ## 중요한 구현 세부사항
 
 ### 네트워크 캡처 ([server.py](server.py):80-112)
