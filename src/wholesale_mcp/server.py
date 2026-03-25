@@ -49,7 +49,11 @@ DATA_DIR = _resolve_data_dir()
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 # 최초 실행 시 번들 레시피를 사용자 폴더에 복사
-_bundled_candidates = [PACKAGE_DIR / "recipes", PACKAGE_DIR.parent / "recipes"]
+_bundled_candidates = [
+    PACKAGE_DIR / "recipes",           # src/wholesale_mcp/recipes/
+    PACKAGE_DIR.parent / "recipes",    # src/recipes/
+    PACKAGE_DIR.parent.parent / "recipes",  # project_root/recipes/
+]
 if getattr(sys, 'frozen', False):
     import sys as _sys
     _bundled_candidates.insert(0, Path(_sys._MEIPASS) / "recipes")
