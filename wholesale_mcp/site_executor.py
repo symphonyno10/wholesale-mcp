@@ -984,7 +984,7 @@ class SiteExecutor:
                 product_name=name,
                 pack_unit=str(item.get(fields.get('pack_unit', ''), '')),
                 quantity=self._parse_int(str(item.get(fields.get('quantity', 'ITEM_CNT_TXT'), '0'))),
-                unit_price=0.0,
+                unit_price=self._parse_price(str(item.get(fields.get('unit_price', ''), '0'))),
                 sales_amount=self._parse_price(str(item.get(fields.get('sales_amount', 'TOTAL_AMT'), '0'))),
                 payment=self._parse_price(str(item.get(fields.get('payment', 'PAY_AMT'), '0'))),
                 balance=self._parse_price(str(item.get(fields.get('balance', 'BALANCE_A_AMT'), '0'))),

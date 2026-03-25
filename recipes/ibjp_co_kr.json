@@ -151,7 +151,10 @@
         "product_name": "ITEM_NM_UNIT",
         "transaction_date": "APRV_DT_FM",
         "quantity": "ITEM_QTY",
+        "unit_price": "ORD_WP2_AMT",
         "sales_amount": "SALE_AMT",
+        "manufacturer": "MAKER_NM",
+        "edi_code": "BOHUM_CD",
         "payment": "PAY_AMT",
         "balance": "BALANCE_A_AMT"
       }

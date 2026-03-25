@@ -114,7 +114,11 @@
       "tx_ven": "{VEN_CD}",
       "sv": "{VEN_CD}",
       "currVenNm": "{VEN_NM}",
-      "transgu": "0"
+      "transgu": "{DETAIL_MODE}"
+    },
+    "detail_values": {
+      "detail": "0",
+      "summary": "1"
     },
     "response_type": "html",
     "parsing": {
