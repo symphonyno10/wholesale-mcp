@@ -133,7 +133,7 @@ class BrowserEngine:
         return self._page
 
     async def ensure_browser(self):
-        """브라우저 싱글톤 초기화 (lazy init)"""
+        """브라우저 싱글톤 초기화 (lazy init). Chromium 없으면 자동 설치."""
         if self._page and not self._page.is_closed():
             return self._page
 
@@ -142,7 +142,19 @@ class BrowserEngine:
         if not self._playwright:
             self._playwright = await async_playwright().start()
         if not self._browser or not self._browser.is_connected():
-            self._browser = await self._playwright.chromium.launch(headless=False)
+            try:
+                self._browser = await self._playwright.chromium.launch(headless=False)
+            except Exception as e:
+                if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
+                    logger.info("Chromium 미설치 → 자동 설치 중...")
+                    import subprocess, sys
+                    subprocess.run(
+                        [sys.executable, "-m", "playwright", "install", "chromium"],
+                        check=True, timeout=120
+                    )
+                    self._browser = await self._playwright.chromium.launch(headless=False)
+                else:
+                    raise
 
         ctx = await self._browser.new_context(
             viewport={"width": 1920, "height": 1080},
