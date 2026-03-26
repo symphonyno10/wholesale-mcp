@@ -33,35 +33,53 @@ def _try_mkdir(p: Path) -> bool:
     except OSError:
         return False
 
+def _get_appdata_via_winapi() -> str:
+    """Windows Shell API로 APPDATA 경로 직접 조회. 환경변수 불필요."""
+    try:
+        import ctypes.wintypes
+        CSIDL_APPDATA = 26
+        buf = ctypes.create_unicode_buffer(ctypes.wintypes.MAX_PATH)
+        if ctypes.windll.shell32.SHGetFolderPathW(None, CSIDL_APPDATA, None, 0, buf) == 0:
+            return buf.value
+    except Exception:
+        pass
+    return ""
+
 def _resolve_data_dir() -> Path:
     """데이터 디렉토리 결정. 각 후보에 mkdir 시도, 성공한 첫 경로 반환.
-    .resolve() 사용 금지 — 네트워크 경로/권한 없는 폴더에서 무한 대기."""
+    .resolve() 사용 금지 — 네트워크 경로/권한 없는 폴더에서 무한 대기.
+    exe 옆(mcpb 폴더)에는 절대 저장 안 함 — 삭제 시 데이터 소실."""
     # 1. 환경변수 명시 지정
     env_dir = os.environ.get("WHOLESALE_MCP_DATA_DIR", "")
     if env_dir and "${" not in env_dir and "%" not in env_dir:
         p = Path(env_dir)
         if p.is_absolute() and _try_mkdir(p):
             return p
-    # 2. Windows APPDATA (가장 안정적)
+    # 2. Windows APPDATA (환경변수)
     appdata = os.environ.get("APPDATA")
     if appdata:
         p = Path(appdata) / "wholesale-mcp"
         if _try_mkdir(p):
             return p
-    # 3. Windows USERPROFILE
+    # 3. Windows Shell API (환경변수 제거되어도 작동 — mcpb 버그 #1254 대응)
+    appdata_api = _get_appdata_via_winapi()
+    if appdata_api:
+        p = Path(appdata_api) / "wholesale-mcp"
+        if _try_mkdir(p):
+            return p
+    # 4. Windows USERPROFILE
     userprofile = os.environ.get("USERPROFILE")
     if userprofile:
         p = Path(userprofile) / "wholesale-mcp-data"
         if _try_mkdir(p):
             return p
-    # 4. Mac/Linux only (Windows에서는 HOME 없음 → 자동 skip)
+    # 5. Mac/Linux (Windows에서는 HOME 없음 → 자동 skip)
     home_env = os.environ.get("HOME")
     if home_env:
         p = Path(home_env) / ".wholesale-mcp"
         if _try_mkdir(p):
             return p
-    # 5. 최종 fallback — temp 디렉토리
-    # exe 옆(mcpb 설치 폴더)에는 절대 저장 안 함 — 삭제 시 데이터 소실
+    # 6. 최종 fallback — temp 디렉토리
     import tempfile
     p = Path(tempfile.gettempdir()) / "wholesale-mcp"
     if _try_mkdir(p):
