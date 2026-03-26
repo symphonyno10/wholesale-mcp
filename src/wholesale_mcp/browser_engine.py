@@ -128,6 +128,14 @@ class BrowserEngine:
         self._MAX_NETWORK_LOG = 500
         self.network_log: deque[dict] = deque(maxlen=self._MAX_NETWORK_LOG)
 
+    @staticmethod
+    def _install_chromium():
+        """Playwright 내장 드라이버로 Chromium 설치. frozen .exe에서도 작동."""
+        import subprocess
+        from playwright._impl._driver import compute_driver_executable
+        node, cli_js = compute_driver_executable()
+        subprocess.run([node, cli_js, "install", "chromium"], check=True, timeout=180)
+
     @property
     def page(self):
         return self._page
@@ -146,12 +154,8 @@ class BrowserEngine:
                 self._browser = await self._playwright.chromium.launch(headless=False)
             except Exception as e:
                 if "Executable doesn't exist" in str(e) or "browserType.launch" in str(e):
-                    logger.info("Chromium 미설치 → 자동 설치 중...")
-                    import subprocess, sys
-                    subprocess.run(
-                        [sys.executable, "-m", "playwright", "install", "chromium"],
-                        check=True, timeout=120
-                    )
+                    logger.info("Chromium 미설치 → 자동 설치 중 (최초 1회)...")
+                    self._install_chromium()
                     self._browser = await self._playwright.chromium.launch(headless=False)
                 else:
                     raise
