@@ -34,13 +34,15 @@ def _try_mkdir(p: Path) -> bool:
         return False
 
 def _resolve_data_dir() -> Path:
+    """데이터 디렉토리 결정. 각 후보에 mkdir 시도, 성공한 첫 경로 반환.
+    .resolve() 사용 금지 — 네트워크 경로/권한 없는 폴더에서 무한 대기."""
     # 1. 환경변수 명시 지정
     env_dir = os.environ.get("WHOLESALE_MCP_DATA_DIR", "")
     if env_dir and "${" not in env_dir and "%" not in env_dir:
         p = Path(env_dir)
         if p.is_absolute() and _try_mkdir(p):
-            return p.resolve()
-    # 2. Windows APPDATA
+            return p
+    # 2. Windows APPDATA (가장 안정적)
     appdata = os.environ.get("APPDATA")
     if appdata:
         p = Path(appdata) / "wholesale-mcp"
@@ -52,22 +54,23 @@ def _resolve_data_dir() -> Path:
         p = Path(userprofile) / "wholesale-mcp-data"
         if _try_mkdir(p):
             return p
-    # 4. Mac/Linux home
-    try:
-        home = Path.home()
-        if home != Path("/"):
-            p = home / ".wholesale-mcp"
-            if _try_mkdir(p):
-                return p
-    except (RuntimeError, OSError):
-        pass
+    # 4. Mac/Linux home (env var 직접 확인 — Path.home()보다 안전)
+    home_env = os.environ.get("HOME")
+    if home_env:
+        p = Path(home_env) / ".wholesale-mcp"
+        if _try_mkdir(p):
+            return p
     # 5. PyInstaller exe 옆
     if getattr(sys, 'frozen', False):
         p = Path(sys.executable).parent / "data"
         if _try_mkdir(p):
             return p
-    # 6. 최종 fallback
-    return Path.cwd()
+    # 6. 최종 fallback — temp 디렉토리 (System32 방지)
+    import tempfile
+    p = Path(tempfile.gettempdir()) / "wholesale-mcp"
+    if _try_mkdir(p):
+        return p
+    return Path(tempfile.gettempdir())
 
 DATA_DIR = _resolve_data_dir()
 _try_mkdir(DATA_DIR)
@@ -1503,21 +1506,15 @@ def _validate_path(file_path: str, must_exist: bool = True) -> Path:
                 f"파일이 없습니다: {file_path}\n"
                 f"list_data_files()로 사용 가능한 파일을 확인하세요."
             )
-        # 심링크 실제 경로 확인
-        try:
-            real_path = target.resolve(strict=True)
-            real_path.relative_to(data_root)
-        except (ValueError, OSError):
-            raise ValueError(f"접근 거부 — 경로 확인 실패: {file_path}")
+        # 심링크 차단 (resolve 대신 is_symlink로 — hang 방지)
+        if target.is_symlink():
+            raise ValueError(f"접근 거부 — 심링크: {file_path}")
     else:
-        # 새 파일: 부모 디렉토리 검증
-        parent = target.parent
-        if parent.exists():
-            real_parent = parent.resolve(strict=True)
-            try:
-                real_parent.relative_to(data_root)
-            except ValueError:
-                raise ValueError(f"접근 거부 — 부모 디렉토리가 허용 범위 외부: {file_path}")
+        # 새 파일: 부모 디렉토리가 DATA_DIR 내부인지 확인
+        try:
+            target.parent.relative_to(data_root)
+        except ValueError:
+            raise ValueError(f"접근 거부 — 부모 디렉토리가 허용 범위 외부: {file_path}")
 
     return target
 
@@ -1696,15 +1693,21 @@ def list_data_files(subdirectory: str = "") -> str:
         }, ensure_ascii=False)
 
     files = []
-    for f in sorted(target_dir.rglob("*")):
-        if f.is_file():
-            rel = f.relative_to(DATA_DIR)
-            stat = f.stat()
-            files.append({
-                "path": str(rel),
-                "size": stat.st_size,
-                "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
-            })
+    try:
+        for f in sorted(target_dir.rglob("*")):
+            try:
+                if f.is_file():
+                    rel = f.relative_to(DATA_DIR)
+                    stat = f.stat()
+                    files.append({
+                        "path": str(rel),
+                        "size": stat.st_size,
+                        "modified": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M"),
+                    })
+            except OSError:
+                continue
+    except OSError:
+        pass
 
     return json.dumps({
         "data_dir": str(DATA_DIR),
@@ -1726,17 +1729,22 @@ def search_data_files(pattern: str = "*.json", keyword: str = "") -> str:
     data_root = DATA_DIR
     matches = []
 
-    for f in sorted(data_root.rglob(pattern)):
-        if not f.is_file():
-            continue
-        # 심링크 체크
+    try:
+        file_list = sorted(data_root.rglob(pattern))
+    except OSError:
+        file_list = []
+    for f in file_list:
         try:
-            f.resolve(strict=True).relative_to(data_root)
-        except (ValueError, OSError):
-            continue
+            if not f.is_file():
+                continue
+            # 심링크 체크 (resolve 없이 — is_symlink로 대체)
+            if f.is_symlink():
+                continue
 
-        rel = str(f.relative_to(data_root))
-        stat = f.stat()
+            rel = str(f.relative_to(data_root))
+            stat = f.stat()
+        except OSError:
+            continue
         entry = {
             "path": rel,
             "size": stat.st_size,
