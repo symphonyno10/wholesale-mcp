@@ -54,7 +54,7 @@ def _resolve_data_dir() -> Path:
         p = Path(userprofile) / "wholesale-mcp-data"
         if _try_mkdir(p):
             return p
-    # 4. Mac/Linux home (env var 직접 확인 — Path.home()보다 안전)
+    # 4. Mac/Linux only (Windows에서는 HOME 없음 → 자동 skip)
     home_env = os.environ.get("HOME")
     if home_env:
         p = Path(home_env) / ".wholesale-mcp"

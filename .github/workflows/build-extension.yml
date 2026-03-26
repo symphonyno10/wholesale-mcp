@@ -29,25 +29,9 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      - name: Install Playwright Chromium
+      - name: Build .exe with PyInstaller
         run: |
-          $env:PLAYWRIGHT_BROWSERS_PATH = "$pwd\playwright-browsers"
-          python -m playwright install chromium
-        env:
-          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\playwright-browsers
-
-      - name: Verify Playwright browsers bundled
-        run: |
-          $chromium = Get-ChildItem -Path playwright-browsers -Recurse -Filter "chrome.exe" -ErrorAction SilentlyContinue
-          if (-not $chromium) {
-            Write-Error "Chromium binary not found in playwright-browsers/"
-            exit 1
-          }
-          Write-Host "Found Chromium: $($chromium.FullName)"
-
-      - name: Build with PyInstaller (onedir for fast startup)
-        run: |
-          pyinstaller main.py --onedir --name wholesale-mcp `
+          pyinstaller main.py --onefile --name wholesale-mcp `
             --paths src `
             --hidden-import wholesale_mcp `
             --hidden-import wholesale_mcp.server `
@@ -61,9 +45,7 @@ jobs:
             --hidden-import mcp.server.fastmcp `
             --collect-all pydantic `
             --collect-all uvicorn `
-            --collect-all playwright `
-            --add-data "recipes;recipes" `
-            --add-data "playwright-browsers;playwright-browsers"
+            --add-data "recipes;recipes"
 
       - name: Sync manifest version
         run: |
@@ -73,7 +55,7 @@ jobs:
       - name: Assemble extension
         run: |
           New-Item -ItemType Directory -Force -Path dist/extension/server
-          Copy-Item -Recurse dist/wholesale-mcp/* dist/extension/server/
+          Copy-Item dist/wholesale-mcp.exe dist/extension/server/
           Copy-Item extension/manifest.json dist/extension/
 
       - name: Pack .mcpb
