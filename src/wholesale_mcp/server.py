@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from mcp.server.fastmcp import FastMCP
 from .browser_engine import BrowserEngine, SNAPSHOT_JS
 
-PACKAGE_DIR = Path(__file__).resolve().parent          # wholesale_mcp/ (번들 레시피)
+PACKAGE_DIR = Path(__file__).parent          # wholesale_mcp/ (번들 레시피, resolve 안 함)
 # 데이터 디렉토리: 환경변수 > APPDATA > USERPROFILE > PyInstaller > cwd
 # mcpb의 ${user_config.*}와 ${HOME}은 Windows에서 동작 불안정 (이슈 #52, #217)
 # 서버가 OS API로 직접 경로 결정
@@ -72,16 +72,18 @@ def _resolve_data_dir() -> Path:
 DATA_DIR = _resolve_data_dir()
 _try_mkdir(DATA_DIR)
 
-# 최초 실행 시 번들 레시피를 사용자 폴더에 복사
+# 최초 실행 시 번들 레시피를 DATA_DIR/recipes/에 복사
+# frozen: _MEIPASS/recipes/ 만 탐색 (상위 폴더 접근 안 함)
+# 개발: PACKAGE_DIR 기준 recipes/ 탐색
 try:
-    _bundled_candidates = [
-        PACKAGE_DIR / "recipes",
-        PACKAGE_DIR.parent / "recipes",
-        PACKAGE_DIR.parent.parent / "recipes",
-    ]
     if getattr(sys, 'frozen', False):
-        import sys as _sys
-        _bundled_candidates.insert(0, Path(_sys._MEIPASS) / "recipes")
+        _bundled_candidates = [Path(sys._MEIPASS) / "recipes"]
+    else:
+        _bundled_candidates = [
+            PACKAGE_DIR / "recipes",
+            PACKAGE_DIR.parent / "recipes",
+            PACKAGE_DIR.parent.parent / "recipes",
+        ]
     _user_recipes = DATA_DIR / "recipes"
     for _bundled_recipes in _bundled_candidates:
         try:
