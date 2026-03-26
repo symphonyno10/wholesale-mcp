@@ -98,7 +98,18 @@ logger.info(f"DATA_DIR: {DATA_DIR}")
 logger.info(f"APPDATA: {os.environ.get('APPDATA', '(없음)')}")
 logger.info(f"frozen: {getattr(sys, 'frozen', False)}")
 
-mcp = FastMCP("wholesale-tools")
+mcp = FastMCP(
+    "wholesale-tools",
+    instructions=(
+        "세션 시작 시 auto_login_all()을 먼저 호출하세요. "
+        "list_sites()로 사용 가능한 사이트와 기능(available_features)을 확인한 후 "
+        "해당 기능만 호출하세요. "
+        "새 사이트 등록: register_site() → analyze_page_for_recipe() → save_recipe(). "
+        "일상 사용: recipe_search() → recipe_add_to_cart(). "
+        "매출 분석: sync_ledger() → search_ledger()/ledger_summary(). "
+        "파일 접근은 반드시 MCP 파일 도구(read_data_file 등)를 사용하세요."
+    ),
+)
 
 # SQLite DB 초기화
 from .db import WholesaleDB
@@ -184,57 +195,57 @@ def _load_recipes() -> dict:
 # 그룹 1: 브라우저 탐색 도구
 # ═══════════════════════════════════════════
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 async def open_site(url: str) -> str:
-    """브라우저에서 사이트 열기. 네트워크 로그 초기화."""
+    """브라우저에서 사이트 열기. 네트워크 로그 초기화. 레시피 생성 워크플로우의 첫 단계."""
     result = await _engine.goto(url, reset_log=True)
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def snapshot_page() -> str:
-    """현재 페이지의 모든 인터랙티브 요소 목록화 (버튼, 링크, 폼, 입력, iframe)"""
+    """현재 페이지의 모든 인터랙티브 요소 목록화 (버튼, 링크, 폼, 입력, iframe). 페이지 변경 없음."""
     result = await _engine.snapshot()
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 async def click_element(selector: str) -> str:
-    """CSS 셀렉터로 요소 클릭. 클릭 후 페이지 변화 요약 반환."""
+    """CSS 셀렉터로 요소 클릭. 클릭 후 페이지 변화 요약 반환. 폼 제출은 submit_form() 사용."""
     result = await _engine.click(selector)
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"idempotentHint": True})
 async def fill_input(selector: str, value: str) -> str:
-    """CSS 셀렉터로 입력 필드에 값 채우기"""
+    """CSS 셀렉터로 입력 필드에 값 채우기. 기존 값을 덮어씀."""
     result = await _engine.fill(selector, value)
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 async def submit_form(form_selector: str = "form") -> str:
-    """폼 제출 (기본: 첫 번째 폼). 제출 후 네트워크 요청 + 결과 반환."""
+    """폼 제출 (기본: 첫 번째 폼). 제출 후 네트워크 요청 + 결과 반환. AJAX 폼은 capture_form_submission() 사용."""
     result = await _engine.submit_form(form_selector)
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def get_network_log(url_filter: str = "") -> str:
-    """캡처된 HTTP 요청 목록. url_filter로 URL 필터링 가능."""
+    """캡처된 HTTP 요청 목록. url_filter로 URL 필터링 가능. 최대 500건 순환 버퍼."""
     result = await _engine.get_network_log(url_filter)
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def get_page_html(selector: str = "") -> str:
     """현재 페이지 HTML. selector 지정 시 해당 영역만. 최대 30KB."""
     return await _engine.get_html(selector)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def screenshot() -> str:
-    """현재 화면 스크린샷을 파일로 저장하고 경로 반환."""
+    """현재 화면 스크린샷을 파일로 저장하고 경로 반환. read_data_file()로 읽을 수 있음."""
     output_dir = DATA_DIR / "screenshots"
     output_dir.mkdir(exist_ok=True)
     fname = f"screenshot_{datetime.now().strftime('%Y%m%d_%H%M%S')}.png"
@@ -248,38 +259,38 @@ async def screenshot() -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 async def execute_js(code: str) -> str:
-    """JavaScript 코드 실행. 반환값은 JSON 직렬화됨."""
+    """JavaScript 코드 실행. 반환값은 JSON 직렬화됨. DOM 변경 가능."""
     result = await _engine.execute_js(code)
     return json.dumps(result, ensure_ascii=False, default=str)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def get_cookies() -> str:
-    """현재 브라우저 세션의 쿠키 목록"""
+    """현재 브라우저 세션의 쿠키 목록."""
     cookies = await _engine.get_cookies()
     return _json(cookies)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True})
 async def set_cookies(cookies_json: str) -> str:
-    """쿠키 주입. JSON 배열 형식: [{"name":"...", "value":"...", "domain":"...", "path":"/"}]"""
+    """브라우저에 쿠키 주입. JSON 배열 형식: [{"name":"...", "value":"...", "domain":"...", "path":"/"}]"""
     cookies = json.loads(cookies_json)
     await _engine.set_cookies(cookies)
     return json.dumps({"added": len(cookies)})
 
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True})
 async def close_browser() -> str:
-    """브라우저 세션 종료"""
+    """브라우저 세션 종료. 재사용하려면 open_site()로 새 세션 시작."""
     await _engine.close()
     return json.dumps({"closed": True})
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def snapshot_iframe(iframe_selector: str) -> str:
-    """iframe 내부의 인터랙티브 요소 목록화"""
+    """iframe 내부의 인터랙티브 요소 목록화. 페이지 변경 없음."""
     result = await _engine.snapshot_iframe(iframe_selector)
     return _json(result)
 
@@ -288,7 +299,7 @@ async def snapshot_iframe(iframe_selector: str) -> str:
 # 그룹 2: 레시피 기반 주문 도구
 # ═══════════════════════════════════════════
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True, "openWorldHint": False})
 def register_site(url: str, username: str, password: str, site_name: str = "") -> str:
     """새 도매 사이트 등록. credentials.json에 ID/PW를 저장한다.
 
@@ -348,7 +359,7 @@ def register_site(url: str, username: str, password: str, site_name: str = "") -
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True, "idempotentHint": True})
 def auto_login_all() -> str:
     """credentials.json에 등록된 모든 사이트에 자동 로그인.
 
@@ -400,9 +411,9 @@ def auto_login_all() -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def list_sites() -> str:
-    """등록된 도매사이트 목록 (JSON 레시피 파일 기반)"""
+    """등록된 도매사이트 목록 + 사용 가능 기능 + 로그인 상태. available_features를 확인 후 해당 기능만 호출할 것."""
     try:
         recipes = _load_recipes()
     except Exception as e:
@@ -441,26 +452,29 @@ def list_sites() -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def get_recipe(site_id: str) -> str:
-    """특정 사이트의 레시피 JSON 조회"""
+    """특정 사이트의 레시피 JSON 조회. list_sites()로 유효한 site_id를 확인할 수 있음."""
     recipes = _load_recipes()
     recipe = recipes.get(site_id)
     if not recipe:
-        raise ValueError(f"레시피 없음: {site_id}")
+        raise ValueError(f"레시피 없음: {site_id}. list_sites()로 사용 가능한 사이트를 확인하세요.")
     return _json(recipe)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True, "idempotentHint": True})
 def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
-    """레시피 기반 HTTP 로그인.
+    """레시피 기반 HTTP 로그인. username/password 생략 시 credentials.json에서 자동 로드.
 
-    username/password를 생략하면 credentials.json에서 자동 로드합니다.
+    Args:
+        site_id: 사이트 ID (예: wos_nicepharm_com). list_sites()로 확인.
+        username: 로그인 ID (생략 시 credentials.json)
+        password: 비밀번호 (생략 시 credentials.json)
     """
     recipes = _load_recipes()
     recipe = recipes.get(site_id)
     if not recipe:
-        raise ValueError(f"레시피 없음: {site_id}")
+        raise ValueError(f"레시피 없음: {site_id}. list_sites()로 사용 가능한 사이트를 확인하세요.")
 
     # credentials.json에서 자동 로드 (_auto fallback 포함)
     cred = _get_credential(site_id) or {}
@@ -468,7 +482,7 @@ def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
         username = username or cred.get("username", "")
         password = password or cred.get("password", "")
     if not username or not password:
-        raise ValueError(f"로그인 정보 없음: credentials.json에 {site_id} 추가 필요")
+        raise ValueError(f"로그인 정보 없음: register_site()로 {site_id}의 ID/PW를 등록하세요.")
 
     # site_params: 사용자별 고유 값 (거래처 코드 등)
     site_params = cred.get("site_params", {})
@@ -494,12 +508,19 @@ def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
 def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int = 0) -> str:
-    """레시피 기반 HTTP 검색. max_pages=0이면 레시피 기본값 사용."""
+    """레시피 기반 HTTP 검색. 결과가 20건 초과 시 파일 저장 후 요약 반환.
+
+    Args:
+        site_id: 사이트 ID (list_sites()로 확인)
+        keyword: 검색어 (필수)
+        edi_code: EDI 코드 (선택, 정확한 약품 매칭)
+        max_pages: 최대 페이지 (0=레시피 기본값, 1-100)
+    """
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     products = executor.search(keyword, edi_code or None, max_pages=max_pages)
     items = [{
@@ -538,12 +559,18 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
     return _json(items)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 def recipe_add_to_cart(site_id: str, product_code: str, quantity: int) -> str:
-    """레시피 기반 HTTP 장바구니 추가"""
+    """장바구니에 상품 추가. product_code는 recipe_search() 결과에서 가져옴.
+
+    Args:
+        site_id: 사이트 ID
+        product_code: 상품 코드 (recipe_search 결과의 product_code)
+        quantity: 수량 (1 이상)
+    """
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     ok = executor.add_to_cart(product_code, quantity)
     return json.dumps({
@@ -554,12 +581,12 @@ def recipe_add_to_cart(site_id: str, product_code: str, quantity: int) -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
 def recipe_view_cart(site_id: str) -> str:
     """장바구니 내역 조회. 현재 담겨있는 상품 목록을 반환합니다."""
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     items = executor.view_cart()
     return json.dumps([{
@@ -571,12 +598,12 @@ def recipe_view_cart(site_id: str) -> str:
     } for item in items], ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True, "openWorldHint": True})
 def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
     """장바구니에서 특정 상품 삭제. 장바구니가 비어있으면 실행하지 않는다."""
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     # 장바구니 비어있으면 실행 거부 (빈 장바구니 삭제 → 무한 팝업 방지)
     try:
@@ -599,12 +626,12 @@ def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True, "openWorldHint": True})
 def recipe_clear_cart(site_id: str) -> str:
-    """장바구니 전체 비우기. 장바구니가 비어있으면 실행하지 않는다."""
+    """장바구니 전체 비우기. 장바구니가 비어있으면 실행하지 않는다. 되돌릴 수 없음."""
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     # 장바구니 비어있으면 실행 거부 (빈 장바구니 비우기 → 무한 팝업 방지)
     try:
@@ -625,12 +652,12 @@ def recipe_clear_cart(site_id: str) -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def get_session_info(site_id: str) -> str:
-    """SiteExecutor 세션 상태 조회 (쿠키, 인증 여부, 헤더)"""
+    """SiteExecutor 세션 상태 조회 (쿠키, 인증 여부, 헤더). 로그인 디버깅용."""
     executor = _executors.get(site_id)
     if not executor:
-        raise ValueError(f"세션 없음: {site_id}")
+        raise ValueError(f"세션 없음: {site_id}. recipe_login('{site_id}')으로 먼저 로그인하세요.")
 
     cookies = {c.name: c.value for c in executor.session.cookies}
     return json.dumps({
@@ -642,21 +669,23 @@ def get_session_info(site_id: str) -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True, "openWorldHint": True})
 def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
                         period: str = "3m", detail: bool = True,
                         product_filter: str = "") -> str:
-    """매출원장 조회. 최근 주문 약품 상세 리스트 확인.
+    """매출원장 조회. 최근 주문 약품 상세 리스트. 결과는 SQLite에 자동 누적 저장.
 
-    날짜 설정:
-    - start_date + end_date 직접 지정 (YYYY-MM-DD)
-    - 또는 period로 상대 기간: "1w", "1m", "3m"(기본), "6m", "1y"
-    - detail=True: 약품별 상세, False: 일자별 요약
-    - product_filter: 약품명 검색 필터
+    Args:
+        site_id: 사이트 ID
+        start_date: 시작일 (YYYY-MM-DD, 생략 시 period 사용)
+        end_date: 종료일 (YYYY-MM-DD, 생략 시 오늘)
+        period: 상대 기간 - "1w", "1m", "3m"(기본), "6m", "1y"
+        detail: True=약품별 상세, False=일자별 요약
+        product_filter: 약품명 검색 필터 (서버 측 후처리)
     """
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     detail_mode = "0" if detail else "1"
     entries = executor.get_sales_ledger(
@@ -721,10 +750,9 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
 # 그룹 3: 레시피 자동 생성 도구
 # ═══════════════════════════════════════════
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def analyze_page_for_recipe(page_type: str = "auto") -> str:
-    """
-    현재 페이지를 3종 동시 분석하여 레시피 생성에 필요한 정보 추출.
+    """현재 페이지를 3종 동시 분석하여 레시피 생성에 필요한 정보 추출. 페이지 변경 없음.
 
     page_type: "login", "search", "cart", "sales_ledger", "auto" (자동 감지)
 
@@ -1125,7 +1153,7 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 async def generate_recipe_spec(site_url: str, site_name: str,
                                 login_analysis: str = "", search_analysis: str = "",
                                 cart_analysis: str = "") -> str:
@@ -1343,10 +1371,9 @@ async def generate_recipe_spec(site_url: str, site_name: str,
     return _json(recipe)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"destructiveHint": True})
 def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
-    """
-    생성된 레시피를 recipes/ 디렉토리에 저장.
+    """생성된 레시피를 recipes/ 디렉토리에 저장. overwrite=False면 기존 파일 보호.
 
     Parameters:
     - site_id: 사이트 ID (파일명으로 사용)
@@ -1845,11 +1872,9 @@ def export_ledger_csv(site_id: str, start_date: str = "", end_date: str = "",
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 async def capture_form_submission(form_selector: str = "form") -> str:
-    """
-    폼 제출을 캡처하여 실제 요청 정보 수집.
-    AJAX/fetch 요청도 캡처하여 SPA 사이트 대응.
+    """폼 제출을 캡처하여 실제 POST URL/payload 수집. AJAX/fetch도 캡처. submit_form()보다 레시피 생성에 적합.
 
     사용법:
     1. fill_input으로 값 채우기
@@ -2357,9 +2382,9 @@ def resource_credentials_template() -> str:
 # Google Form URL (레시피 제출용)
 _RECIPE_FORM_URL = "https://docs.google.com/forms/d/e/1FAIpQLSf9-Ij0DgX20UJDGS2LTp0CxiLz_wQfm90dTf3WvB5G3ovYSw/viewform"
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True})
 def share_recipe(site_id: str) -> str:
-    """레시피를 커뮤니티에 공유합니다. Google Form을 통해 검토 대기열에 제출됩니다."""
+    """레시피를 커뮤니티에 공유. Google Form으로 검토 대기열에 제출. 개인정보 미포함."""
     import urllib.request
     import urllib.parse
 
@@ -2401,15 +2426,13 @@ def share_recipe(site_id: str) -> str:
 # 그룹 6: SQLite 매출원장 분석 도구
 # ═══════════════════════════════════════════
 
-@mcp.tool()
+@mcp.tool(annotations={"openWorldHint": True, "idempotentHint": True})
 def sync_ledger(site_id: str, period: str = "3m") -> str:
-    """매출원장을 사이트에서 가져와 SQLite DB에 누적 저장.
+    """매출원장을 사이트에서 가져와 SQLite DB에 누적 저장. 중복 자동 스킵.
 
-    중복 데이터는 자동 스킵. 호출할 때마다 새 데이터만 추가됩니다.
-
-    Parameters:
-    - site_id: 사이트 ID 또는 "all" (전체 사이트)
-    - period: 동기화 기간 ("1w", "1m", "3m", "6m", "1y")
+    Args:
+        site_id: 사이트 ID 또는 "all" (로그인된 전체 사이트)
+        period: 동기화 기간 ("1w", "1m", "3m", "6m", "1y")
     """
     if site_id == "all":
         results = {}
@@ -2428,7 +2451,7 @@ def sync_ledger(site_id: str, period: str = "3m") -> str:
 
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
-        raise ValueError(f"로그인 먼저 필요: {site_id}")
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
 
     entries = executor.get_sales_ledger(period=period, detail_mode="0")
     items = [{"date": e.transaction_date, "product_name": e.product_name,
@@ -2440,19 +2463,16 @@ def sync_ledger(site_id: str, period: str = "3m") -> str:
     return _json(result)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def search_ledger(keyword: str, site_id: str = "all", period: str = "3m",
                   limit: int = 100) -> str:
-    """SQLite DB에서 약품명으로 매출원장 검색.
+    """로컬 SQLite DB에서 약품명으로 매출원장 검색. 사이트 접속 불필요. DB 비어있으면 sync_ledger() 먼저.
 
-    사이트에 접속하지 않고 로컬 DB에서 즉시 검색합니다.
-    DB에 데이터가 없으면 sync_ledger를 먼저 실행하세요.
-
-    Parameters:
-    - keyword: 약품명 검색어
-    - site_id: 사이트 ID 또는 "all"
-    - period: 검색 기간
-    - limit: 최대 반환 건수
+    Args:
+        keyword: 약품명 검색어
+        site_id: 사이트 ID 또는 "all"
+        period: 검색 기간 ("1w", "1m", "3m", "6m", "1y")
+        limit: 최대 반환 건수 (기본 100)
     """
     rows = _db.search(keyword, site_id, period, limit)
     return json.dumps({
@@ -2463,17 +2483,15 @@ def search_ledger(keyword: str, site_id: str = "all", period: str = "3m",
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def ledger_summary(site_id: str = "all", period: str = "1m",
                    top_n: int = 20) -> str:
-    """약품별 주문 합계 (TOP N).
+    """약품별 주문 합계 TOP N. 가장 많이 주문한 약품 매출액 순위.
 
-    가장 많이 주문한 약품, 매출액 순위를 확인합니다.
-
-    Parameters:
-    - site_id: 사이트 ID 또는 "all" (전체 도매)
-    - period: 기간
-    - top_n: 상위 몇 개
+    Args:
+        site_id: 사이트 ID 또는 "all"
+        period: 기간 ("1w", "1m", "3m", "6m", "1y")
+        top_n: 상위 개수 (기본 20)
     """
     rows = _db.summary(site_id, period, top_n)
     return json.dumps({
@@ -2484,15 +2502,13 @@ def ledger_summary(site_id: str = "all", period: str = "1m",
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def ledger_compare(keyword: str, period: str = "3m") -> str:
-    """도매별 같은 약품 가격 비교.
+    """도매별 같은 약품 가격 비교. 여러 도매 단가/주문량 대조.
 
-    여러 도매에서 같은 약품의 단가, 주문량을 비교합니다.
-
-    Parameters:
-    - keyword: 약품명 검색어
-    - period: 비교 기간
+    Args:
+        keyword: 약품명 검색어
+        period: 비교 기간 ("1w", "1m", "3m", "6m", "1y")
     """
     rows = _db.compare(keyword, period)
     return json.dumps({
@@ -2502,15 +2518,15 @@ def ledger_compare(keyword: str, period: str = "3m") -> str:
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def ledger_trend(keyword: str = "", site_id: str = "all",
                  period: str = "6m") -> str:
-    """월별 주문 추이.
+    """월별 주문 추이. 매출 트렌드 분석.
 
-    Parameters:
-    - keyword: 약품명 (빈 값이면 전체)
-    - site_id: 사이트 ID 또는 "all"
-    - period: 기간
+    Args:
+        keyword: 약품명 (빈 값이면 전체)
+        site_id: 사이트 ID 또는 "all"
+        period: 기간 ("1m", "3m", "6m", "1y")
     """
     rows = _db.trend(keyword, site_id, period)
     return json.dumps({
@@ -2521,7 +2537,7 @@ def ledger_trend(keyword: str = "", site_id: str = "all",
     }, ensure_ascii=False)
 
 
-@mcp.tool()
+@mcp.tool(annotations={"readOnlyHint": True})
 def db_stats() -> str:
     """SQLite DB 현황 — 저장된 매출원장/약품 수, 사이트별 통계."""
     stats = _db.stats()

@@ -36,6 +36,15 @@ jobs:
         env:
           PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\playwright-browsers
 
+      - name: Verify Playwright browsers bundled
+        run: |
+          $chromium = Get-ChildItem -Path playwright-browsers -Recurse -Filter "chrome.exe" -ErrorAction SilentlyContinue
+          if (-not $chromium) {
+            Write-Error "Chromium binary not found in playwright-browsers/"
+            exit 1
+          }
+          Write-Host "Found Chromium: $($chromium.FullName)"
+
       - name: Build .exe with PyInstaller
         run: |
           pyinstaller main.py --onefile --name wholesale-mcp `

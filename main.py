@@ -4,7 +4,11 @@ import sys
 from pathlib import Path
 
 if getattr(sys, 'frozen', False):
-    # PyInstaller: 번들된 Playwright 브라우저 경로 설정
+    # PyInstaller: 호스트 시스템 Python 격리
+    os.environ.pop("PYTHONPATH", None)
+    os.environ.pop("PYTHONHOME", None)
+
+    # 번들된 Playwright 브라우저 경로 설정
     _meipass = Path(sys._MEIPASS)
     _browsers = _meipass / "playwright-browsers"
     if _browsers.is_dir():
