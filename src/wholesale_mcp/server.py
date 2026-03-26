@@ -60,12 +60,8 @@ def _resolve_data_dir() -> Path:
         p = Path(home_env) / ".wholesale-mcp"
         if _try_mkdir(p):
             return p
-    # 5. PyInstaller exe 옆
-    if getattr(sys, 'frozen', False):
-        p = Path(sys.executable).parent / "data"
-        if _try_mkdir(p):
-            return p
-    # 6. 최종 fallback — temp 디렉토리 (System32 방지)
+    # 5. 최종 fallback — temp 디렉토리
+    # exe 옆(mcpb 설치 폴더)에는 절대 저장 안 함 — 삭제 시 데이터 소실
     import tempfile
     p = Path(tempfile.gettempdir()) / "wholesale-mcp"
     if _try_mkdir(p):
