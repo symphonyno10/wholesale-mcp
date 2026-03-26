@@ -287,10 +287,15 @@ class BrowserEngine:
         page = await self.ensure_browser()
         try:
             await page.click(selector, timeout=5000)
-            await page.wait_for_load_state("networkidle", timeout=5000)
+            await page.wait_for_load_state("load", timeout=5000)
         except Exception:
             pass
-        return {"clicked": selector, "current_url": page.url, "title": await page.title()}
+        title = ""
+        try:
+            title = await page.title()
+        except Exception:
+            pass
+        return {"clicked": selector, "current_url": page.url, "title": title}
 
     async def submit_form(self, form_selector: str = "form") -> dict:
         """폼 제출 + 새로 발생한 네트워크 요청 반환"""
