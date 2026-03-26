@@ -29,7 +29,13 @@ jobs:
           pip install pyinstaller
           pip install -r requirements.txt
 
-      - name: Build .exe with PyInstaller
+      - name: Install Playwright Chromium
+        run: |
+          python -m playwright install chromium
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}\playwright-browsers
+
+      - name: Build with PyInstaller (onedir — 설치 시 1회 해제, 이후 즉시 시작)
         run: |
           pyinstaller main.py --onedir --name wholesale-mcp `
             --paths src `
@@ -45,7 +51,9 @@ jobs:
             --hidden-import mcp.server.fastmcp `
             --collect-all pydantic `
             --collect-all uvicorn `
-            --add-data "recipes;recipes"
+            --collect-all playwright `
+            --add-data "recipes;recipes" `
+            --add-data "playwright-browsers;playwright-browsers"
 
       - name: Sync manifest version
         run: |

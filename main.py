@@ -7,6 +7,14 @@ if getattr(sys, 'frozen', False):
     # PyInstaller: 호스트 시스템 Python 격리
     os.environ.pop("PYTHONPATH", None)
     os.environ.pop("PYTHONHOME", None)
+
+    # 번들된 Playwright 브라우저 경로 (onedir: _internal/ 안에 포함)
+    _exe_dir = Path(sys.executable).parent
+    _browsers = _exe_dir / "playwright-browsers"
+    if not _browsers.exists():
+        _browsers = Path(sys._MEIPASS) / "playwright-browsers"
+    if _browsers.exists():
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(_browsers)
 else:
     # 개발 모드: src/ 디렉토리를 sys.path에 추가
     src_dir = Path(__file__).resolve().parent / "src"
