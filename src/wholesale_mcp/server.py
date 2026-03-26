@@ -73,25 +73,31 @@ DATA_DIR = _resolve_data_dir()
 _try_mkdir(DATA_DIR)
 
 # 최초 실행 시 번들 레시피를 사용자 폴더에 복사
-_bundled_candidates = [
-    PACKAGE_DIR / "recipes",           # src/wholesale_mcp/recipes/
-    PACKAGE_DIR.parent / "recipes",    # src/recipes/
-    PACKAGE_DIR.parent.parent / "recipes",  # project_root/recipes/
-]
-if getattr(sys, 'frozen', False):
-    import sys as _sys
-    _bundled_candidates.insert(0, Path(_sys._MEIPASS) / "recipes")
-_user_recipes = DATA_DIR / "recipes"
-for _bundled_recipes in _bundled_candidates:
-    if _bundled_recipes.exists() and _bundled_recipes.is_dir() and \
-       _bundled_recipes.resolve() != _user_recipes.resolve():
-        _user_recipes.mkdir(exist_ok=True)
-        import shutil
-        for src in _bundled_recipes.glob("*.json"):
-            dst = _user_recipes / src.name
-            if not dst.exists():
-                shutil.copy2(src, dst)
-        break
+try:
+    _bundled_candidates = [
+        PACKAGE_DIR / "recipes",
+        PACKAGE_DIR.parent / "recipes",
+        PACKAGE_DIR.parent.parent / "recipes",
+    ]
+    if getattr(sys, 'frozen', False):
+        import sys as _sys
+        _bundled_candidates.insert(0, Path(_sys._MEIPASS) / "recipes")
+    _user_recipes = DATA_DIR / "recipes"
+    for _bundled_recipes in _bundled_candidates:
+        try:
+            if _bundled_recipes.exists() and _bundled_recipes.is_dir() and \
+               str(_bundled_recipes) != str(_user_recipes):
+                _try_mkdir(_user_recipes)
+                import shutil
+                for _src in _bundled_recipes.glob("*.json"):
+                    _dst = _user_recipes / _src.name
+                    if not _dst.exists():
+                        shutil.copy2(_src, _dst)
+                break
+        except OSError:
+            continue
+except Exception:
+    pass  # 레시피 복사 실패해도 서버 시작은 계속
 
 logging.Formatter.converter = time.gmtime
 logging.basicConfig(
@@ -191,7 +197,7 @@ def _load_recipes() -> dict:
     _scan_dir(bundled_dir, "번들")
 
     user_dir = DATA_DIR / "recipes"
-    if user_dir.resolve() != bundled_dir.resolve():
+    if str(user_dir) != str(bundled_dir):
         _scan_dir(user_dir, "사용자")
 
     return _recipes
@@ -1470,12 +1476,15 @@ def _validate_path(file_path: str, must_exist: bool = True) -> Path:
     if '\x00' in file_path:
         raise ValueError("경로에 null byte를 포함할 수 없습니다.")
 
-    data_root = DATA_DIR.resolve()
+    data_root = DATA_DIR
     p = Path(file_path)
-    if p.is_absolute():
-        target = p.resolve()
-    else:
-        target = (DATA_DIR / file_path).resolve()
+    try:
+        if p.is_absolute():
+            target = p.resolve()
+        else:
+            target = (DATA_DIR / file_path).resolve()
+    except OSError:
+        raise ValueError(f"경로 접근 불가: {file_path}")
 
     # 샌드박스 경계 확인
     try:
@@ -1493,11 +1502,11 @@ def _validate_path(file_path: str, must_exist: bool = True) -> Path:
                 f"list_data_files()로 사용 가능한 파일을 확인하세요."
             )
         # 심링크 실제 경로 확인
-        real_path = target.resolve(strict=True)
         try:
+            real_path = target.resolve(strict=True)
             real_path.relative_to(data_root)
-        except ValueError:
-            raise ValueError(f"접근 거부 — 심링크 대상이 허용 디렉토리 외부: {file_path}")
+        except (ValueError, OSError):
+            raise ValueError(f"접근 거부 — 경로 확인 실패: {file_path}")
     else:
         # 새 파일: 부모 디렉토리 검증
         parent = target.parent
@@ -1550,11 +1559,14 @@ def list_allowed_directories() -> str:
     AI 클라이언트의 자체 파일 도구(Read, Write 등)로는 이 디렉토리에 접근할 수 없으므로,
     반드시 MCP 서버의 파일 도구를 사용해야 합니다.
     """
-    data_root = DATA_DIR.resolve()
+    data_root = DATA_DIR
     subdirs = []
-    for d in sorted(data_root.iterdir()):
-        if d.is_dir():
-            subdirs.append(str(d.relative_to(data_root)))
+    try:
+        for d in sorted(data_root.iterdir()):
+            if d.is_dir():
+                subdirs.append(d.name)
+    except OSError:
+        pass
 
     return json.dumps({
         "allowed_directories": [str(data_root)],
@@ -1709,7 +1721,7 @@ def search_data_files(pattern: str = "*.json", keyword: str = "") -> str:
     - pattern: glob 패턴 (예: "*.json", "data/ledger_*.csv", "**/*.json")
     - keyword: 파일 내용에서 검색할 키워드 (선택)
     """
-    data_root = DATA_DIR.resolve()
+    data_root = DATA_DIR
     matches = []
 
     for f in sorted(data_root.rglob(pattern)):
@@ -1788,7 +1800,7 @@ def write_data_file(file_path: str, content: str, format: str = "auto") -> str:
 
     # 원자적 쓰기
     _atomic_write(target, content)
-    rel_path = target.relative_to(DATA_DIR.resolve())
+    rel_path = target.relative_to(DATA_DIR)
 
     return json.dumps({
         "success": True,
