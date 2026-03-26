@@ -24,29 +24,52 @@ PACKAGE_DIR = Path(__file__).resolve().parent          # wholesale_mcp/ (번들 
 # 데이터 디렉토리: 환경변수 > APPDATA > USERPROFILE > PyInstaller > cwd
 # mcpb의 ${user_config.*}와 ${HOME}은 Windows에서 동작 불안정 (이슈 #52, #217)
 # 서버가 OS API로 직접 경로 결정
+def _try_mkdir(p: Path) -> bool:
+    """디렉토리 생성 시도. 성공하면 True, 권한 등 문제 시 False."""
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        return True
+    except OSError:
+        return False
+
 def _resolve_data_dir() -> Path:
+    # 1. 환경변수 명시 지정
     env_dir = os.environ.get("WHOLESALE_MCP_DATA_DIR", "")
     if env_dir and "${" not in env_dir and "%" not in env_dir:
         p = Path(env_dir)
-        if p.is_absolute():
-            p.mkdir(parents=True, exist_ok=True)
+        if p.is_absolute() and _try_mkdir(p):
             return p.resolve()
+    # 2. Windows APPDATA
     appdata = os.environ.get("APPDATA")
     if appdata:
-        return Path(appdata) / "wholesale-mcp"
+        p = Path(appdata) / "wholesale-mcp"
+        if _try_mkdir(p):
+            return p
+    # 3. Windows USERPROFILE
     userprofile = os.environ.get("USERPROFILE")
     if userprofile:
-        return Path(userprofile) / "wholesale-mcp-data"
-    # Mac/Linux: ~/.wholesale-mcp
-    home = Path.home()
-    if home != Path("/"):
-        return home / ".wholesale-mcp"
+        p = Path(userprofile) / "wholesale-mcp-data"
+        if _try_mkdir(p):
+            return p
+    # 4. Mac/Linux home
+    try:
+        home = Path.home()
+        if home != Path("/"):
+            p = home / ".wholesale-mcp"
+            if _try_mkdir(p):
+                return p
+    except (RuntimeError, OSError):
+        pass
+    # 5. PyInstaller exe 옆
     if getattr(sys, 'frozen', False):
-        return Path(sys.executable).parent / "data"
+        p = Path(sys.executable).parent / "data"
+        if _try_mkdir(p):
+            return p
+    # 6. 최종 fallback
     return Path.cwd()
 
 DATA_DIR = _resolve_data_dir()
-DATA_DIR.mkdir(parents=True, exist_ok=True)
+_try_mkdir(DATA_DIR)
 
 # 최초 실행 시 번들 레시피를 사용자 폴더에 복사
 _bundled_candidates = [

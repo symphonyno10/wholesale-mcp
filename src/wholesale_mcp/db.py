@@ -16,7 +16,10 @@ class WholesaleDB:
 
     def __init__(self, db_path: Path):
         self.db_path = db_path
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        except OSError:
+            pass
         self._init_db()
 
     def _conn(self) -> sqlite3.Connection:
