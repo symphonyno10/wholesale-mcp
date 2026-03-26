@@ -8,6 +8,7 @@ server.py (MCP 도구)와 recipe_explorer.py (탐색기) 양쪽에서 사용.
 import asyncio
 import json
 import logging
+from collections import deque
 from typing import Optional, Callable, Any
 
 logger = logging.getLogger("browser-engine")
@@ -124,7 +125,8 @@ class BrowserEngine:
         self._playwright = None
         self._browser = None
         self._page = None
-        self.network_log: list[dict] = []
+        self._MAX_NETWORK_LOG = 500
+        self.network_log: deque[dict] = deque(maxlen=self._MAX_NETWORK_LOG)
 
     @property
     def page(self):
@@ -148,7 +150,7 @@ class BrowserEngine:
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
         )
         self._page = await ctx.new_page()
-        self.network_log = []
+        self.network_log.clear()
 
         # confirm/alert/prompt 다이얼로그 자동 수락 (반복 방지)
         self._dialog_count = 0
@@ -208,7 +210,7 @@ class BrowserEngine:
         """URL 이동. reset_log=True면 네트워크 로그 초기화."""
         page = await self.ensure_browser()
         if reset_log:
-            self.network_log = []
+            self.network_log.clear()
         try:
             await page.goto(url, wait_until="networkidle", timeout=30000)
         except Exception:
@@ -293,7 +295,7 @@ class BrowserEngine:
         except Exception:
             pass
 
-        new_requests = self.network_log[before_count:]
+        new_requests = list(self.network_log)[before_count:]
         return {
             "current_url": page.url,
             "new_requests": len(new_requests),
@@ -302,7 +304,8 @@ class BrowserEngine:
 
     async def get_network_log(self, url_filter: str = "", method_filter: str = "") -> dict:
         """네트워크 로그 반환. URL/메서드 필터 가능."""
-        filtered = self.network_log
+        log_list = list(self.network_log)
+        filtered = log_list
         if url_filter:
             filtered = [e for e in filtered if url_filter.lower() in e["url"].lower()]
         if method_filter:
@@ -381,7 +384,7 @@ class BrowserEngine:
         before_count = len(self.network_log)
         await action_coro
         await self.wait_for_stable(5000)
-        return self.network_log[before_count:]
+        return list(self.network_log)[before_count:]
 
     async def get_accessibility_tree(self) -> list[dict]:
         """CDP 접근성 트리에서 의미 있는 노드만 추출.

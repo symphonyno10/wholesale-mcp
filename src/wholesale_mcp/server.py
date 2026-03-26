@@ -85,24 +85,33 @@ _db = WholesaleDB(DATA_DIR / "wholesale.db")
 _engine = BrowserEngine()
 _executors: dict = {}  # site_id → SiteExecutor
 _credentials: dict = {}  # site_id → {username, password}
+_credentials_mtime: float = 0  # credentials.json 마지막 수정 시간
 _recipes: dict = {}    # site_id → recipe dict
+_recipes_mtime: dict = {}  # recipe file path → mtime (캐시 무효화용)
 _last_recipe_draft: dict = {}  # 최근 analyze_page_for_recipe()의 recipe_draft (save_recipe 병합용)
 
 
 # ── 헬퍼 ──
 
+def _json(obj, *, indent=None) -> str:
+    """JSON 직렬화. indent 미지정 시 컴팩트 출력 (토큰 절약)."""
+    return json.dumps(obj, ensure_ascii=False, indent=indent, default=str, separators=(',', ':') if indent is None else None)
+
 def _load_credentials() -> dict:
-    """credentials.json에서 사이트별 로그인 정보 로드"""
-    global _credentials
-    if _credentials:
-        return _credentials
+    """credentials.json에서 사이트별 로그인 정보 로드 (mtime 기반 캐시 무효화)"""
+    global _credentials, _credentials_mtime
     cred_path = DATA_DIR / "credentials.json"
-    if cred_path.exists():
-        try:
-            _credentials = json.loads(cred_path.read_text(encoding="utf-8"))
-            logger.info(f"크레덴셜 로드: {list(_credentials.keys())}")
-        except Exception as e:
-            logger.error(f"크레덴셜 로드 실패: {e}")
+    if not cred_path.exists():
+        return _credentials
+    try:
+        current_mtime = cred_path.stat().st_mtime
+        if _credentials and current_mtime == _credentials_mtime:
+            return _credentials
+        _credentials = json.loads(cred_path.read_text(encoding="utf-8"))
+        _credentials_mtime = current_mtime
+        logger.info(f"크레덴셜 로드: {list(_credentials.keys())}")
+    except Exception as e:
+        logger.error(f"크레덴셜 로드 실패: {e}")
     return _credentials
 
 
@@ -118,34 +127,33 @@ def _get_credential(site_id: str) -> dict | None:
 
 
 def _load_recipes() -> dict:
-    """번들 + 사용자 recipes/ 디렉토리에서 레시피 JSON 로드"""
-    global _recipes
-    if _recipes:
-        return _recipes
+    """번들 + 사용자 recipes/ 디렉토리에서 레시피 JSON 로드 (mtime 기반 캐시 무효화)"""
+    global _recipes, _recipes_mtime
 
-    # 1. 번들 레시피 (pip 패키지에 포함, 낮은 우선순위)
+    def _scan_dir(d: Path, label: str):
+        if not d.is_dir():
+            return
+        for f in d.glob("*.json"):
+            try:
+                fpath = str(f)
+                current_mtime = f.stat().st_mtime
+                if fpath in _recipes_mtime and _recipes_mtime[fpath] == current_mtime:
+                    continue  # 변경 없음 — 스킵
+                recipe = json.loads(f.read_text(encoding="utf-8"))
+                site_id = recipe.get("site_id", f.stem)
+                _recipes[site_id] = recipe
+                _recipes_mtime[fpath] = current_mtime
+                logger.info(f"레시피 로드 ({label}): {site_id}")
+            except Exception as e:
+                logger.error(f"레시피 로드 실패 {f.name}: {e}")
+
     bundled_dir = PACKAGE_DIR / "recipes"
-    if bundled_dir.is_dir():
-        for f in bundled_dir.glob("*.json"):
-            try:
-                recipe = json.loads(f.read_text(encoding="utf-8"))
-                site_id = recipe.get("site_id", f.stem)
-                _recipes[site_id] = recipe
-                logger.info(f"레시피 로드 (번들): {site_id}")
-            except Exception as e:
-                logger.error(f"레시피 로드 실패 {f.name}: {e}")
+    _scan_dir(bundled_dir, "번들")
 
-    # 2. 사용자 레시피 (CWD/recipes/, 높은 우선순위 — 같은 site_id면 덮어씀)
     user_dir = DATA_DIR / "recipes"
-    if user_dir.is_dir() and user_dir.resolve() != bundled_dir.resolve():
-        for f in user_dir.glob("*.json"):
-            try:
-                recipe = json.loads(f.read_text(encoding="utf-8"))
-                site_id = recipe.get("site_id", f.stem)
-                _recipes[site_id] = recipe
-                logger.info(f"레시피 로드 (사용자): {site_id}")
-            except Exception as e:
-                logger.error(f"레시피 로드 실패 {f.name}: {e}")
+    if user_dir.resolve() != bundled_dir.resolve():
+        _scan_dir(user_dir, "사용자")
+
     return _recipes
 
 
@@ -157,42 +165,42 @@ def _load_recipes() -> dict:
 async def open_site(url: str) -> str:
     """브라우저에서 사이트 열기. 네트워크 로그 초기화."""
     result = await _engine.goto(url, reset_log=True)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
 async def snapshot_page() -> str:
     """현재 페이지의 모든 인터랙티브 요소 목록화 (버튼, 링크, 폼, 입력, iframe)"""
     result = await _engine.snapshot()
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
 async def click_element(selector: str) -> str:
     """CSS 셀렉터로 요소 클릭. 클릭 후 페이지 변화 요약 반환."""
     result = await _engine.click(selector)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
 async def fill_input(selector: str, value: str) -> str:
     """CSS 셀렉터로 입력 필드에 값 채우기"""
     result = await _engine.fill(selector, value)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
 async def submit_form(form_selector: str = "form") -> str:
     """폼 제출 (기본: 첫 번째 폼). 제출 후 네트워크 요청 + 결과 반환."""
     result = await _engine.submit_form(form_selector)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
 async def get_network_log(url_filter: str = "") -> str:
     """캡처된 HTTP 요청 목록. url_filter로 URL 필터링 가능."""
     result = await _engine.get_network_log(url_filter)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
@@ -214,7 +222,7 @@ async def screenshot() -> str:
         "path": rel_path,
         "absolute_path": str(fpath),
         "how_to_read": f"read_data_file('{rel_path}')로 읽을 수 있습니다."
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -228,7 +236,7 @@ async def execute_js(code: str) -> str:
 async def get_cookies() -> str:
     """현재 브라우저 세션의 쿠키 목록"""
     cookies = await _engine.get_cookies()
-    return json.dumps(cookies, ensure_ascii=False, indent=2)
+    return _json(cookies)
 
 
 @mcp.tool()
@@ -250,7 +258,7 @@ async def close_browser() -> str:
 async def snapshot_iframe(iframe_selector: str) -> str:
     """iframe 내부의 인터랙티브 요소 목록화"""
     result = await _engine.snapshot_iframe(iframe_selector)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 # ═══════════════════════════════════════════
@@ -314,7 +322,7 @@ def register_site(url: str, username: str, password: str, site_name: str = "") -
             f"open_site('{url}') → analyze_page_for_recipe() → 분석 → save_recipe()로 레시피를 생성하세요."
         )
 
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
@@ -344,6 +352,10 @@ def auto_login_all() -> str:
 
         try:
             site_params = cred.get("site_params", {})
+            # 기존 executor 정리
+            old = _executors.pop(site_id, None)
+            if old:
+                old.close()
             executor = SiteExecutor(recipe)
             ok = executor.login(username, password, site_params=site_params)
             if ok:
@@ -362,7 +374,7 @@ def auto_login_all() -> str:
     return json.dumps({
         "summary": f"{success}/{total} 사이트 로그인 성공",
         "sites": results,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -403,7 +415,7 @@ def list_sites() -> str:
         "data_dir": str(DATA_DIR),
         "sites": sites,
         "file_tools": "list_data_files(), read_data_file(), write_data_file(), export_ledger_csv() 사용 가능"
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -413,7 +425,7 @@ def get_recipe(site_id: str) -> str:
     recipe = recipes.get(site_id)
     if not recipe:
         raise ValueError(f"레시피 없음: {site_id}")
-    return json.dumps(recipe, ensure_ascii=False, indent=2)
+    return _json(recipe)
 
 
 @mcp.tool()
@@ -439,6 +451,10 @@ def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
     site_params = cred.get("site_params", {})
 
     from .site_executor import SiteExecutor
+    # 기존 executor 정리
+    old = _executors.pop(site_id, None)
+    if old:
+        old.close()
     executor = SiteExecutor(recipe)
     ok = executor.login(username, password, site_params=site_params)
     if ok:
@@ -494,9 +510,9 @@ def recipe_search(site_id: str, keyword: str, edi_code: str = "", max_pages: int
             "sample": items[:5],
             "message": f"결과 {len(items)}건. 상위 5건만 표시.",
             "how_to_read": f"read_data_file('{rel_path}')로 전체 데이터를 읽으세요."
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
 
-    return json.dumps(items, ensure_ascii=False, indent=2)
+    return _json(items)
 
 
 @mcp.tool()
@@ -529,7 +545,7 @@ def recipe_view_cart(site_id: str) -> str:
         "quantity": item.quantity,
         "unit_price": item.unit_price,
         "total_price": item.total_price,
-    } for item in items], ensure_ascii=False, indent=2)
+    } for item in items], ensure_ascii=False)
 
 
 @mcp.tool()
@@ -548,7 +564,7 @@ def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
                 "site_id": site_id,
                 "product_code": product_code,
                 "error": "장바구니가 비어있습니다. 삭제할 상품이 없습니다."
-            }, ensure_ascii=False, indent=2)
+            }, ensure_ascii=False)
     except Exception:
         pass  # view_cart 실패해도 삭제 시도는 허용
 
@@ -557,7 +573,7 @@ def recipe_delete_from_cart(site_id: str, product_code: str) -> str:
         "success": ok,
         "site_id": site_id,
         "product_code": product_code,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -575,7 +591,7 @@ def recipe_clear_cart(site_id: str) -> str:
                 "success": True,
                 "site_id": site_id,
                 "message": "장바구니가 이미 비어있습니다."
-            }, ensure_ascii=False, indent=2)
+            }, ensure_ascii=False)
     except Exception:
         pass  # view_cart 실패해도 비우기 시도는 허용
 
@@ -583,7 +599,7 @@ def recipe_clear_cart(site_id: str) -> str:
     return json.dumps({
         "success": ok,
         "site_id": site_id,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -600,7 +616,7 @@ def get_session_info(site_id: str) -> str:
         "cookies": cookies,
         "headers": dict(executor.session.headers),
         "login_data": executor._login_data,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -666,7 +682,7 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
             "sample": items[:5],
             "message": f"매출원장 {len(items)}건 (합계 {total_amount:,.0f}원). 상위 5건만 표시.",
             "how_to_read": f"read_data_file('{rel_path}')로 전체 데이터를 읽으세요. CSV 내보내기: export_ledger_csv('{site_id}')"
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
 
     return json.dumps({
         "site_id": site_id,
@@ -675,7 +691,7 @@ def recipe_sales_ledger(site_id: str, start_date: str = "", end_date: str = "",
         "total_entries": len(items),
         "total_amount": total_amount,
         "entries": items
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 # ═══════════════════════════════════════════
@@ -1083,7 +1099,7 @@ async def analyze_page_for_recipe(page_type: str = "auto") -> str:
     if recipe_draft:
         _last_recipe_draft = recipe_draft
 
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
@@ -1301,7 +1317,7 @@ async def generate_recipe_spec(site_url: str, site_name: str,
     recipe["verified"] = False
     recipe["requires_manual_review"] = True
 
-    return json.dumps(recipe, ensure_ascii=False, indent=2)
+    return _json(recipe)
 
 
 @mcp.tool()
@@ -1337,7 +1353,10 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
             if sf.get("params") and not search.get("params"):
                 search["params"] = sf["params"]
                 recipe["search"] = search
-                logger.info(f"[{site_id}] recipe_draft에서 search.params 자동 병합")
+                logger.info(f"[{site_id}] recipe_draft에서 search.params 자동 ��합")
+
+            # 사용 후 메모리 해제
+            _last_recipe_draft = {}
 
         recipes_dir = DATA_DIR / "recipes"
         recipes_dir.mkdir(exist_ok=True)
@@ -1362,7 +1381,7 @@ def save_recipe(site_id: str, recipe_json: str, overwrite: bool = False) -> str:
             "file_path": str(file_path),
             "site_id": site_id,
             "message": "레시피가 성공적으로 저장되었습니다"
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
 
     except json.JSONDecodeError as e:
         raise ValueError(f"JSON 파싱 실패: {e}")
@@ -1492,7 +1511,7 @@ def list_allowed_directories() -> str:
             "meta": ["list_allowed_directories"],
         },
         "note": "AI 클라이언트의 자체 파일 도구(Read/Write)로는 이 디렉토리에 접근 불가. 반드시 위 MCP 도구를 사용하세요."
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "title": "데이터 파일 읽기"})
@@ -1533,9 +1552,9 @@ def read_data_file(file_path: str, offset: int = 0, limit: int = 200,
                 "count": len(sliced),
                 "items": sliced,
                 "data_dir": str(DATA_DIR),
-            }, ensure_ascii=False, indent=2)
+            }, ensure_ascii=False)
         # dict 등 다른 JSON은 그대로 반환
-        return json.dumps(data, ensure_ascii=False, indent=2)
+        return json.dumps(data, ensure_ascii=False)
 
     # 텍스트/CSV 파일
     text = target.read_text(encoding='utf-8')
@@ -1578,7 +1597,7 @@ def get_file_info(file_path: str) -> str:
         "created": datetime.fromtimestamp(stat.st_ctime).strftime("%Y-%m-%d %H:%M:%S"),
         "is_symlink": target.is_symlink(),
         "suffix": target.suffix,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "title": "파일 목록 조회"})
@@ -1604,7 +1623,7 @@ def list_data_files(subdirectory: str = "") -> str:
             "subdirectory": subdirectory,
             "files": [],
             "message": "디렉토리가 비어있거나 존재하지 않습니다."
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
 
     files = []
     for f in sorted(target_dir.rglob("*")):
@@ -1623,7 +1642,7 @@ def list_data_files(subdirectory: str = "") -> str:
         "total_files": len(files),
         "files": files,
         "usage": "read_data_file('경로')로 파일 내용을 읽으세요."
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool(annotations={"readOnlyHint": True, "title": "파일 검색"})
@@ -1676,7 +1695,7 @@ def search_data_files(pattern: str = "*.json", keyword: str = "") -> str:
         "keyword": keyword,
         "total_matches": len(matches),
         "files": matches,
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool(annotations={
@@ -1721,7 +1740,7 @@ def write_data_file(file_path: str, content: str, format: str = "auto") -> str:
         "absolute_path": str(target),
         "size": target.stat().st_size,
         "message": f"파일 저장 완료. read_data_file('{rel_path}')로 읽을 수 있습니다."
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool(annotations={
@@ -1800,7 +1819,7 @@ def export_ledger_csv(site_id: str, start_date: str = "", end_date: str = "",
         "message": f"매출원장 {len(items)}건 CSV/JSON 저장 완료. "
                    f"read_data_file('{csv_path.relative_to(DATA_DIR)}')로 읽을 수 있습니다.",
         "sample": items[:5],
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -1843,7 +1862,7 @@ async def capture_form_submission(form_selector: str = "form") -> str:
             "success": False,
             "error": "POST 요청이 캡처되지 않았습니다",
             "all_requests": new_requests[:10]
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
 
     main_request = post_requests[0]
 
@@ -1861,7 +1880,7 @@ async def capture_form_submission(form_selector: str = "form") -> str:
         "current_url": page.url
     }
 
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 # ═══════════════════════════════════════════
@@ -2289,7 +2308,7 @@ def resource_recipe_list() -> str:
             })
         except Exception:
             pass
-    return json.dumps(recipes, ensure_ascii=False, indent=2)
+    return _json(recipes)
 
 
 @mcp.resource("recipes://credentials-template")
@@ -2305,7 +2324,7 @@ def resource_credentials_template() -> str:
             }
         }
     }
-    return json.dumps(template, ensure_ascii=False, indent=2)
+    return _json(template)
 
 
 # ═══════════════════════════════════════════
@@ -2350,7 +2369,7 @@ def share_recipe(site_id: str) -> str:
             "site_id": site_id,
             "site_name": site_name,
             "message": "레시피가 검토 대기열에 제출되었습니다. 관리자 검토 후 공개됩니다."
-        }, ensure_ascii=False, indent=2)
+        }, ensure_ascii=False)
     except Exception as e:
         raise ValueError(f"레시피 제출 실패: {e}")
 
@@ -2382,7 +2401,7 @@ def sync_ledger(site_id: str, period: str = "3m") -> str:
                 results[sid] = _db.upsert_ledger(items, sid)
             except Exception as e:
                 results[sid] = {"error": str(e)[:80]}
-        return json.dumps(results, ensure_ascii=False, indent=2)
+        return _json(results)
 
     executor = _executors.get(site_id)
     if not executor or not executor.is_authenticated():
@@ -2395,7 +2414,7 @@ def sync_ledger(site_id: str, period: str = "3m") -> str:
              "balance": e.balance, "manufacturer": e.manufacturer,
              "edi_code": getattr(e, 'edi_code', '')} for e in entries]
     result = _db.upsert_ledger(items, site_id)
-    return json.dumps(result, ensure_ascii=False, indent=2)
+    return _json(result)
 
 
 @mcp.tool()
@@ -2418,7 +2437,7 @@ def search_ledger(keyword: str, site_id: str = "all", period: str = "3m",
         "period": period,
         "total": len(rows),
         "entries": rows
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -2439,7 +2458,7 @@ def ledger_summary(site_id: str = "all", period: str = "1m",
         "period": period,
         "top_n": top_n,
         "items": rows
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -2457,7 +2476,7 @@ def ledger_compare(keyword: str, period: str = "3m") -> str:
         "keyword": keyword,
         "period": period,
         "sites": rows
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
@@ -2476,14 +2495,14 @@ def ledger_trend(keyword: str = "", site_id: str = "all",
         "site_id": site_id,
         "period": period,
         "months": rows
-    }, ensure_ascii=False, indent=2)
+    }, ensure_ascii=False)
 
 
 @mcp.tool()
 def db_stats() -> str:
     """SQLite DB 현황 — 저장된 매출원장/약품 수, 사이트별 통계."""
     stats = _db.stats()
-    return json.dumps(stats, ensure_ascii=False, indent=2)
+    return _json(stats)
 
 
 # ── 엔트리포인트 ──
