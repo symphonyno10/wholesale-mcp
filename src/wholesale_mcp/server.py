@@ -13,6 +13,7 @@ AI 코딩 어시스턴트(Claude Code, Cursor 등)에서 MCP 연결하여
 import json
 import os
 import sys
+import time
 import logging
 from pathlib import Path
 from datetime import datetime, timezone
@@ -92,7 +93,12 @@ for _bundled_recipes in _bundled_candidates:
                 shutil.copy2(src, dst)
         break
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
+logging.Formatter.converter = time.gmtime
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)sZ [%(levelname)s] %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+)
 logger = logging.getLogger("wholesale-mcp")
 logger.info(f"DATA_DIR: {DATA_DIR}")
 logger.info(f"APPDATA: {os.environ.get('APPDATA', '(없음)')}")
@@ -2547,7 +2553,13 @@ def db_stats() -> str:
 # ── 엔트리포인트 ──
 
 def main():
-    mcp.run(transport="stdio")
+    try:
+        mcp.run(transport="stdio")
+    except (ValueError, OSError, BrokenPipeError):
+        # Claude Desktop이 연결을 끊으면 발생 — 정상 종료 처리
+        pass
+    except KeyboardInterrupt:
+        pass
 
 if __name__ == "__main__":
     main()

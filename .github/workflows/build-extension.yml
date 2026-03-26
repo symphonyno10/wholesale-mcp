@@ -45,9 +45,9 @@ jobs:
           }
           Write-Host "Found Chromium: $($chromium.FullName)"
 
-      - name: Build .exe with PyInstaller
+      - name: Build with PyInstaller (onedir for fast startup)
         run: |
-          pyinstaller main.py --onefile --name wholesale-mcp `
+          pyinstaller main.py --onedir --name wholesale-mcp `
             --paths src `
             --hidden-import wholesale_mcp `
             --hidden-import wholesale_mcp.server `
@@ -73,7 +73,7 @@ jobs:
       - name: Assemble extension
         run: |
           New-Item -ItemType Directory -Force -Path dist/extension/server
-          Copy-Item dist/wholesale-mcp.exe dist/extension/server/
+          Copy-Item -Recurse dist/wholesale-mcp/* dist/extension/server/
           Copy-Item extension/manifest.json dist/extension/
 
       - name: Pack .mcpb
