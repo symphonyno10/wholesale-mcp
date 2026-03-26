@@ -37,11 +37,20 @@ class SiteExecutor:
         self._authenticated = False
         self._last_search_html = ''
         self._last_search_url = ''
-        self._search_html_pages: list[str] = []
+        self._search_html_pages: list[str] = []  # max 10 pages, reset per search
+        self._MAX_SEARCH_PAGES = 10
         self._cached_username = ''
         self._cached_password = ''
         self._cached_site_params = {}
         self._login_data = {}  # 로그인 응답에서 추출한 사용자 정보 (custCd, userId 등)
+
+    def close(self):
+        """세션 종료 및 메모리 해제"""
+        self.session.close()
+        self._last_search_html = ''
+        self._search_html_pages.clear()
+        self._login_data.clear()
+        self._authenticated = False
 
     def _get_step(self, step_name: str) -> Optional[dict]:
         step = self.recipe.get(step_name)
@@ -309,14 +318,15 @@ class SiteExecutor:
             products, resp_data = self._search_single_page(query, edi_code, search_spec)
             all_products.extend(products)
             if isinstance(resp_data, str):
-                self._search_html_pages.append(resp_data)
+                if len(self._search_html_pages) < self._MAX_SEARCH_PAGES:
+                    self._search_html_pages.append(resp_data)
                 total_pages = min(self._get_total_pages_html(resp_data, pagination), page_limit)
                 for page_num in range(2, total_pages + 1):
                     products, page_html = self._search_page_by_url(
                         query, edi_code, search_spec, pagination, page_num
                     )
                     all_products.extend(products)
-                    if isinstance(page_html, str):
+                    if isinstance(page_html, str) and len(self._search_html_pages) < self._MAX_SEARCH_PAGES:
                         self._search_html_pages.append(page_html)
                     if not products:
                         break
