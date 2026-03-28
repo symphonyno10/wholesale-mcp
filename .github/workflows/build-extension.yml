@@ -52,6 +52,7 @@ jobs:
             --collect-all pydantic `
             --collect-all uvicorn `
             --collect-all playwright `
+            --hidden-import openpyxl `
             --add-data "recipes;recipes" `
             --add-data "playwright-browsers;playwright-browsers"
 

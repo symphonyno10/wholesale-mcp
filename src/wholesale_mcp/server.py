@@ -522,13 +522,15 @@ def get_recipe(site_id: str) -> str:
 
 
 @mcp.tool(annotations={"openWorldHint": True, "idempotentHint": True})
-def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
+def recipe_login(site_id: str, username: str = "", password: str = "",
+                 save_credentials: bool = False) -> str:
     """레시피 기반 HTTP 로그인. username/password 생략 시 credentials.json에서 자동 로드.
 
     Args:
         site_id: 사이트 ID (예: wos_nicepharm_com). list_sites()로 확인.
         username: 로그인 ID (생략 시 credentials.json)
         password: 비밀번호 (생략 시 credentials.json)
+        save_credentials: True면 로그인 성공 시 credentials.json에 저장
     """
     recipe = _get_recipe(site_id)
     if not recipe:
@@ -555,11 +557,28 @@ def recipe_login(site_id: str, username: str = "", password: str = "") -> str:
     if ok:
         _executors[site_id] = executor
 
+        # 자격증명 저장
+        if save_credentials and username and password:
+            global _credentials, _credentials_mtime
+            cred_path = DATA_DIR / "credentials.json"
+            creds = {}
+            if cred_path.exists():
+                try:
+                    creds = json.loads(cred_path.read_text(encoding="utf-8"))
+                except Exception:
+                    pass
+            creds[site_id] = {"username": username, "password": password}
+            cred_path.write_text(json.dumps(creds, ensure_ascii=False, indent=2), encoding="utf-8")
+            _credentials = creds
+            _credentials_mtime = cred_path.stat().st_mtime
+            logger.info(f"자격증명 저장: {site_id}")
+
     cookie_names = [c.name for c in executor.session.cookies]
     return json.dumps({
         "success": ok,
         "site_id": site_id,
         "authenticated": executor.is_authenticated(),
+        "credentials_saved": save_credentials and ok,
         "cookies": len(cookie_names),
         "cookie_names": cookie_names,
         "login_data_keys": list(executor._login_data.keys()) if hasattr(executor, '_login_data') else []
@@ -636,6 +655,103 @@ def recipe_add_to_cart(site_id: str, product_code: str, quantity: int) -> str:
         "site_id": site_id,
         "product_code": product_code,
         "quantity": quantity
+    }, ensure_ascii=False)
+
+
+@mcp.tool(annotations={"openWorldHint": True})
+def bulk_add_to_cart(site_id: str, items_json: str) -> str:
+    """일괄 장바구니 추가. 여러 약품을 한 번에 검색 → 자동 선택 → 담기.
+
+    Args:
+        site_id: 사이트 ID
+        items_json: JSON 배열 문자열 [{"keyword": "타이레놀", "quantity": 1}, ...]
+    """
+    executor = _executors.get(site_id)
+    if not executor or not executor.is_authenticated():
+        raise ValueError(f"로그인 먼저 필요: auto_login_all() 또는 recipe_login('{site_id}')을 실행하세요.")
+
+    items = json.loads(items_json)
+    success, failed, manual_required = [], [], []
+
+    for item in items:
+        keyword = item.get("keyword", "")
+        quantity = item.get("quantity", 1)
+        preferred_pack_unit = item.get("pack_unit", "")
+
+        if not keyword:
+            failed.append({"keyword": keyword, "reason": "키워드 없음"})
+            continue
+
+        try:
+            products = executor.search(keyword)
+        except Exception as e:
+            failed.append({"keyword": keyword, "reason": f"검색 실패: {e}"})
+            continue
+
+        if not products:
+            failed.append({"keyword": keyword, "reason": "검색 결과 없음"})
+            continue
+
+        # 재고 있는 것만 필터
+        in_stock = [p for p in products if p.stock_quantity and p.stock_quantity > 0]
+        candidates = in_stock if in_stock else products
+
+        # 자동 선택
+        selected = None
+        if len(candidates) == 1:
+            selected = candidates[0]
+        elif preferred_pack_unit:
+            # pack_unit 지정 시 매칭
+            for p in candidates:
+                if preferred_pack_unit.lower() in (p.pack_unit or "").lower():
+                    selected = p
+                    break
+        if not selected:
+            # DB에서 최근 주문 이력으로 매칭
+            db_rows = _db.search(keyword, site_id, "3m", 5)
+            if db_rows:
+                last_pack = db_rows[0].get("pack_unit", "")
+                for p in candidates:
+                    if last_pack and last_pack.lower() in (p.pack_unit or "").lower():
+                        selected = p
+                        break
+        if not selected and len(candidates) <= 3:
+            # 후보가 3개 이하면 첫 번째 선택
+            selected = candidates[0]
+
+        if not selected:
+            manual_required.append({
+                "keyword": keyword,
+                "quantity": quantity,
+                "candidates": [{"product_code": p.product_code, "product_name": p.product_name,
+                                "pack_unit": p.pack_unit, "unit_price": p.unit_price,
+                                "stock_quantity": p.stock_quantity} for p in candidates[:5]],
+                "reason": f"후보 {len(candidates)}개 — 수동 선택 필요"
+            })
+            continue
+
+        try:
+            ok = executor.add_to_cart(selected.product_code, quantity)
+            if ok:
+                success.append({
+                    "keyword": keyword,
+                    "product_name": selected.product_name,
+                    "product_code": selected.product_code,
+                    "pack_unit": selected.pack_unit,
+                    "unit_price": selected.unit_price,
+                    "quantity": quantity,
+                })
+            else:
+                failed.append({"keyword": keyword, "reason": "장바구니 추가 실패"})
+        except Exception as e:
+            failed.append({"keyword": keyword, "reason": f"담기 실패: {e}"})
+
+    return json.dumps({
+        "site_id": site_id,
+        "summary": f"성공 {len(success)}, 실패 {len(failed)}, 수동 {len(manual_required)}",
+        "success": success,
+        "failed": failed,
+        "manual_required": manual_required,
     }, ensure_ascii=False)
 
 
@@ -2675,6 +2791,148 @@ def db_stats() -> str:
     """SQLite DB 현황 — 저장된 매출원장/약품 수, 사이트별 통계."""
     stats = _db.stats()
     return _json(stats)
+
+
+@mcp.tool(annotations={"openWorldHint": True, "readOnlyHint": True})
+def generate_daily_order_plan(file_path: str, period: str = "3m") -> str:
+    """약품 사용량 파일(엑셀/CSV) → 주문 계획 자동 생성.
+
+    각 약품을 로그인된 전체 도매에서 실시간 검색하여
+    포장단위, 재고, 단가를 비교한 뒤 최적 주문 계획을 만듭니다.
+
+    Args:
+        file_path: DATA_DIR 내 엑셀(.xlsx) 또는 CSV 파일 경로.
+                   최소 컬럼: 약품명(product_name), 사용량(quantity/usage)
+        period: DB 이력 조회 기간 (기본 3m)
+    """
+    import math
+    import csv
+    import io
+
+    # 파일 읽기
+    target = _validate_data_file_path(file_path, must_exist=True)
+    ext = target.suffix.lower()
+
+    rows = []
+    if ext == '.xlsx':
+        try:
+            import openpyxl
+            wb = openpyxl.load_workbook(str(target), read_only=True)
+            ws = wb.active
+            headers = [str(cell.value or "").strip().lower() for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+            for row in ws.iter_rows(min_row=2, values_only=True):
+                d = {headers[i]: row[i] for i in range(min(len(headers), len(row)))}
+                rows.append(d)
+            wb.close()
+        except ImportError:
+            raise ValueError("openpyxl 미설치. pip install openpyxl 또는 CSV 파일을 사용하세요.")
+    elif ext == '.csv':
+        content = target.read_text(encoding='utf-8-sig')
+        reader = csv.DictReader(io.StringIO(content))
+        rows = [{k.strip().lower(): v for k, v in row.items()} for row in reader]
+    else:
+        raise ValueError(f"지원하지 않는 형식: {ext}. .xlsx 또는 .csv만 지원.")
+
+    if not rows:
+        raise ValueError("파일이 비어있습니다.")
+
+    # 컬럼명 매핑 (유연하게)
+    def _find_col(row, candidates):
+        for c in candidates:
+            if c in row and row[c]:
+                return row[c]
+        return None
+
+    # 로그인된 사이트 목록
+    active_sites = {sid: ex for sid, ex in _executors.items() if ex.is_authenticated()}
+    if not active_sites:
+        raise ValueError("로그인된 사이트가 없습니다. auto_login_all()을 먼저 실행하세요.")
+
+    plan = []
+    for row in rows:
+        name = _find_col(row, ['약품명', 'product_name', '약품', '상품명', 'name', '품명'])
+        usage = _find_col(row, ['사용량', 'quantity', 'usage', '수량', 'daily_usage', '일사용량'])
+
+        if not name:
+            continue
+        try:
+            usage = float(str(usage).replace(',', ''))
+        except (ValueError, TypeError):
+            usage = 0
+
+        # 전체 사이트에서 검색
+        site_results = []
+        for sid, executor in active_sites.items():
+            try:
+                products = executor.search(str(name))
+                for p in products:
+                    if p.stock_quantity and p.stock_quantity > 0:
+                        pack_size = p.pack_units[0] if p.pack_units else 0
+                        site_results.append({
+                            "site_id": sid,
+                            "product_code": p.product_code,
+                            "product_name": p.product_name,
+                            "pack_unit": p.pack_unit,
+                            "pack_size": pack_size,
+                            "unit_price": p.unit_price or 0,
+                            "stock_quantity": p.stock_quantity,
+                        })
+            except Exception:
+                continue
+
+        if not site_results:
+            plan.append({
+                "input_name": str(name),
+                "daily_usage": usage,
+                "status": "검색 결과 없음 또는 전 사이트 재고 없음",
+            })
+            continue
+
+        # 최저가 선택
+        best = min(site_results, key=lambda r: r["unit_price"]) if site_results else site_results[0]
+        pack_size = best["pack_size"]
+        order_qty = math.ceil(usage / pack_size) if pack_size > 0 and usage > 0 else 1
+
+        plan.append({
+            "input_name": str(name),
+            "daily_usage": usage,
+            "recommended_site": best["site_id"],
+            "product_name": best["product_name"],
+            "product_code": best["product_code"],
+            "pack_unit": best["pack_unit"],
+            "pack_size": pack_size,
+            "order_quantity": order_qty,
+            "unit_price": best["unit_price"],
+            "estimated_cost": order_qty * best["unit_price"],
+            "stock": best["stock_quantity"],
+            "alternatives": len(site_results) - 1,
+        })
+
+    # CSV 저장
+    data_dir = DATA_DIR / "data"
+    _try_mkdir(data_dir)
+    from datetime import date
+    out_path = data_dir / f"order_plan_{date.today().isoformat()}.csv"
+    with open(str(out_path), 'w', encoding='utf-8-sig', newline='') as f:
+        if plan:
+            writer = csv.DictWriter(f, fieldnames=plan[0].keys())
+            writer.writeheader()
+            writer.writerows(plan)
+
+    total_cost = sum(p.get("estimated_cost", 0) for p in plan if isinstance(p.get("estimated_cost"), (int, float)))
+    found = sum(1 for p in plan if "recommended_site" in p)
+    not_found = sum(1 for p in plan if "status" in p)
+
+    return json.dumps({
+        "total_items": len(plan),
+        "found": found,
+        "not_found": not_found,
+        "estimated_total_cost": total_cost,
+        "saved_to": str(out_path.relative_to(DATA_DIR)),
+        "plan": plan[:20],
+        "message": f"주문 계획 {len(plan)}건 생성 (총 예상 {total_cost:,.0f}원). "
+                   f"전체 목록: read_data_file('{out_path.relative_to(DATA_DIR)}')"
+    }, ensure_ascii=False)
 
 
 # ── 엔트리포인트 ──
